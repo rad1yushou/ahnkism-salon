@@ -5,6 +5,7 @@ import { buildMetadata } from '@/lib/metadata';
 import Breadcrumb from '@/components/seo/Breadcrumb';
 import Container from '@/components/ui/Container';
 import ReservationCTA from '@/components/ui/ReservationCTA';
+import LazyAutoPlayVideo from '@/components/ui/LazyAutoPlayVideo';
 import { STAFF, getStaffBySlug, type StaffMember } from '@/constants/staff';
 import { SALONS } from '@/constants/salons';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
@@ -234,12 +235,8 @@ export default async function StaffDetailPage({ params }: Props) {
                     className="aspect-[3/4] relative bg-stone-100 overflow-hidden"
                   >
                     {media.media_type === 'video' ? (
-                      <video
+                      <LazyAutoPlayVideo
                         src={media.media_url}
-                        autoPlay
-                        muted
-                        loop
-                        playsInline
                         className="absolute inset-0 w-full h-full object-cover"
                       />
                     ) : (

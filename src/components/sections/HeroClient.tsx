@@ -46,6 +46,7 @@ function SlideMedia({ slide, priority }: { slide: HeroSlide; priority: boolean }
           muted
           loop
           playsInline
+          preload="metadata"
           className="absolute inset-0 w-full h-full object-cover scale-110 blur-sm opacity-60"
         />
         <video
@@ -54,6 +55,7 @@ function SlideMedia({ slide, priority }: { slide: HeroSlide; priority: boolean }
           muted
           loop
           playsInline
+          preload="metadata"
           className="absolute inset-0 w-full h-full object-contain z-10"
         />
       </>
@@ -81,6 +83,7 @@ function PickupMedia({ pickup, alt }: { pickup: HeroPickup; alt: string }) {
           muted
           loop
           playsInline
+          preload="metadata"
           className="absolute inset-0 w-full h-full object-cover scale-110 blur-sm opacity-60"
         />
         <video
@@ -89,6 +92,7 @@ function PickupMedia({ pickup, alt }: { pickup: HeroPickup; alt: string }) {
           muted
           loop
           playsInline
+          preload="metadata"
           className="absolute inset-0 w-full h-full object-contain z-10"
         />
       </>

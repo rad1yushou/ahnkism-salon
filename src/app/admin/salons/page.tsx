@@ -95,7 +95,7 @@ function Field({
       <label className="block text-[10px] tracking-widest text-stone-500 mb-1">
         {label}{required && <span className="text-red-400 ml-0.5">*</span>}
       </label>
-      {rows ? (
+      {rows != null ? (
         <textarea
           value={value ?? ''}
           onChange={e => onChange(e.target.value)}
