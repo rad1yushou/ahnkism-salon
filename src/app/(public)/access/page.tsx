@@ -81,16 +81,16 @@ export default async function AccessPage() {
                 <div className="space-y-3 text-sm mb-4">
                   <div>
                     <span className="text-xs text-stone-400 block mb-0.5">住所</span>
-                    <span className="text-stone-700">{salon.address}</span>
+                    <span className="text-stone-700 whitespace-pre-line">{salon.address}</span>
                   </div>
                   <div>
                     <span className="text-xs text-stone-400 block mb-0.5">最寄り駅</span>
-                    <span className="text-stone-700">{salon.nearestStation}</span>
+                    <span className="text-stone-700 whitespace-pre-line">{salon.nearestStation}</span>
                   </div>
                   <div>
                     <span className="text-xs text-stone-400 block mb-0.5">営業時間</span>
-                    <span className="text-stone-700">{salon.hours}</span>
-                    <span className="text-xs text-stone-400 block">{salon.hoursNote}</span>
+                    <span className="text-stone-700 whitespace-pre-line">{salon.hours}</span>
+                    <span className="text-xs text-stone-400 block whitespace-pre-line">{salon.hoursNote}</span>
                   </div>
                   <div>
                     <span className="text-xs text-stone-400 block mb-0.5">電話番号</span>

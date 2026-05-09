@@ -8,6 +8,7 @@ import ReservationCTA from '@/components/ui/ReservationCTA';
 import { getSalonBySlug, SALONS, type Salon } from '@/constants/salons';
 import { getStaffBySalon, type StaffMember } from '@/constants/staff';
 import StaffCard from '@/components/cards/StaffCard';
+import LazyAutoPlayVideo from '@/components/ui/LazyAutoPlayVideo';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 type SalonDetailProps = {
@@ -133,16 +134,16 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
             <div className="space-y-5">
               <div>
                 <p className="text-xs tracking-widest text-stone-400 mb-1">住所</p>
-                <p className="text-sm text-stone-700">{salon.address}</p>
+                <p className="text-sm text-stone-700 whitespace-pre-line">{salon.address}</p>
               </div>
               <div>
                 <p className="text-xs tracking-widest text-stone-400 mb-1">アクセス</p>
-                <p className="text-sm text-stone-700">{salon.nearestStation}</p>
+                <p className="text-sm text-stone-700 whitespace-pre-line">{salon.nearestStation}</p>
               </div>
               <div>
                 <p className="text-xs tracking-widest text-stone-400 mb-1">営業時間</p>
-                <p className="text-sm text-stone-700">{salon.hours}</p>
-                <p className="text-xs text-stone-400">{salon.hoursNote}</p>
+                <p className="text-sm text-stone-700 whitespace-pre-line">{salon.hours}</p>
+                <p className="text-xs text-stone-400 whitespace-pre-line">{salon.hoursNote}</p>
               </div>
               <div>
                 <p className="text-xs tracking-widest text-stone-400 mb-1">電話番号</p>
@@ -204,12 +205,8 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
                     <div className="aspect-[4/3] relative bg-stone-100 overflow-hidden flex items-center justify-center">
                       {menu.image_url ? (
                         menu.media_type === 'video' ? (
-                          <video
+                          <LazyAutoPlayVideo
                             src={menu.image_url}
-                            autoPlay
-                            muted
-                            loop
-                            playsInline
                             className="absolute inset-0 w-full h-full object-cover"
                           />
                         ) : (

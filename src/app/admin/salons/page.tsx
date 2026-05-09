@@ -385,6 +385,7 @@ export default function AdminSalonsPage() {
                         value={form.address}
                         onChange={v => setField('address', v)}
                         placeholder="大阪府大阪市西区南堀江..."
+                        rows={2}
                       />
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
@@ -399,6 +400,7 @@ export default function AdminSalonsPage() {
                         value={form.nearest_station}
                         onChange={v => setField('nearest_station', v)}
                         placeholder="西大橋駅 徒歩3分"
+                        rows={3}
                       />
                     </div>
                   </div>
@@ -412,12 +414,14 @@ export default function AdminSalonsPage() {
                         value={form.hours}
                         onChange={v => setField('hours', v)}
                         placeholder="10:00〜20:00"
+                        rows={2}
                       />
                       <Field
                         label="備考（定休日など）"
                         value={form.hours_note}
                         onChange={v => setField('hours_note', v)}
                         placeholder="火曜定休"
+                        rows={2}
                       />
                     </div>
                   </div>
