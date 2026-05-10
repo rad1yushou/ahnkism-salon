@@ -43,6 +43,9 @@ export default function StaffCard({ member }: StaffCardProps) {
           </span>
         ))}
       </div>
+      <p className="mt-3 text-[11px] tracking-widest text-[#C9A96E] group-hover:text-[#b8935a] transition-colors">
+        プロフィールを見る →
+      </p>
     </Link>
   );
 }
