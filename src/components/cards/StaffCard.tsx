@@ -43,9 +43,9 @@ export default function StaffCard({ member }: StaffCardProps) {
           </span>
         ))}
       </div>
-      <p className="mt-3 text-[11px] tracking-widest text-[#C9A96E] group-hover:text-[#b8935a] transition-colors">
-        プロフィールを見る →
-      </p>
+      <span className="mt-3 inline-flex items-center px-4 py-1.5 rounded-full border border-[#C9A96E]/40 text-[11px] tracking-widest text-[#C9A96E] group-hover:bg-[#C9A96E] group-hover:text-white transition-colors">
+        スタイル・施術動画を見る →
+      </span>
     </Link>
   );
 }
