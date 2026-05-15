@@ -46,6 +46,8 @@ type Staff = {
   image_url: string | null;
   sort_order: number;
   is_active: boolean;
+  is_featured: boolean;
+  featured_order: number;
 };
 
 type EditForm = {
@@ -62,6 +64,8 @@ type EditForm = {
   image_url: string | null;
   sort_order: number;
   is_active: boolean;
+  is_featured: boolean;
+  featured_order: number;
 };
 
 type NewForm = EditForm & { slug: string };
@@ -90,6 +94,8 @@ const EMPTY_EDIT_FORM: EditForm = {
   image_url: null,
   sort_order: 1,
   is_active: true,
+  is_featured: false,
+  featured_order: 0,
 };
 
 function toEditForm(s: Staff): EditForm {
@@ -107,6 +113,8 @@ function toEditForm(s: Staff): EditForm {
     image_url: s.image_url,
     sort_order: s.sort_order,
     is_active: s.is_active,
+    is_featured: s.is_featured,
+    featured_order: s.featured_order,
   };
 }
 
@@ -227,6 +235,23 @@ function FormFields({ f, onChange }: { f: EditForm; onChange: FormFieldsOnChange
               公開する（チェックを外すと非表示）
             </label>
           </div>
+          <div className="flex items-center gap-2">
+            <input
+              id="is_featured_field"
+              type="checkbox"
+              checked={f.is_featured}
+              onChange={(e) => onChange('is_featured', e.target.checked)}
+              className="rounded border-stone-300"
+            />
+            <label htmlFor="is_featured_field" className="text-xs text-stone-600">
+              トップページに表示する
+            </label>
+          </div>
+          {f.is_featured && (
+            <div className="w-40">
+              <Field label="TOP表示順 (featured_order)" value={f.featured_order} onChange={(v) => onChange('featured_order', Number(v))} placeholder="0" type="number" />
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -325,6 +350,8 @@ export default function AdminStaffPage() {
         image_url: form.image_url || null,
         sort_order: form.sort_order,
         is_active: form.is_active,
+        is_featured: form.is_featured,
+        featured_order: form.featured_order,
       })
       .eq('id', staffId);
     setSaving(false);
@@ -371,6 +398,8 @@ export default function AdminStaffPage() {
         booking_url: newForm.booking_url || null,
         sort_order: newForm.sort_order,
         is_active: newForm.is_active,
+        is_featured: newForm.is_featured,
+        featured_order: newForm.featured_order,
       });
     setSavingNew(false);
     if (error) { showMessage(`追加失敗: ${error.message}`); return; }
@@ -599,6 +628,11 @@ export default function AdminStaffPage() {
                   }`}>
                     {s.is_active ? '公開中' : '非表示中'}
                   </span>
+                  {s.is_featured && (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded font-medium text-white bg-amber-500">
+                      TOP掲載
+                    </span>
+                  )}
                   <div>
                     <p className="text-sm font-medium text-stone-800 tracking-wide">{s.name}</p>
                     <p className="text-[10px] text-stone-400 tracking-wider mt-0.5">

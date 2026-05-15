@@ -13,9 +13,11 @@ export default async function StaffSection() {
   if (supabase) {
     const { data, error } = await supabase
       .from('staff')
-      .select('slug, name, name_kana, role, salon_slug, bio, specialties, recommended_menu, instagram_url, tiktok_url, booking_url, image_url, sort_order, is_active')
+      .select('slug, name, name_kana, role, salon_slug, bio, specialties, recommended_menu, instagram_url, tiktok_url, booking_url, image_url, sort_order, is_active, is_featured, featured_order')
       .eq('is_active', true)
-      .order('sort_order', { ascending: true });
+      .eq('is_featured', true)
+      .order('featured_order', { ascending: true })
+      .limit(4);
 
     if (!error && data) {
       staff = data.map((r) => {
