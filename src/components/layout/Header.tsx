@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useState } from 'react';
-import { BOOKING_URL, SITE } from '@/constants/site';
+import { SITE } from '@/constants/site';
 
 const NAV_LINKS = [
   { href: '/about', label: 'グループ紹介' },
@@ -47,14 +47,12 @@ export default function Header() {
 
         {/* CTA + Hamburger */}
         <div className="flex items-center gap-3">
-          <a
-            href={BOOKING_URL}
-            target="_blank"
-            rel="noopener noreferrer"
+          <Link
+            href="/reservation"
             className="hidden sm:inline-flex items-center px-5 py-2 text-xs tracking-widest bg-[#C9A96E] text-white hover:bg-[#b8964f] transition-colors"
           >
             ご予約
-          </a>
+          </Link>
           <button
             type="button"
             onClick={() => setMenuOpen(!menuOpen)}
@@ -84,14 +82,13 @@ export default function Header() {
               </Link>
             ))}
             <div className="px-6 pt-3">
-              <a
-                href={BOOKING_URL}
-                target="_blank"
-                rel="noopener noreferrer"
+              <Link
+                href="/reservation"
+                onClick={() => setMenuOpen(false)}
                 className="block text-center py-3 text-sm tracking-widest bg-[#C9A96E] text-white hover:bg-[#b8964f] transition-colors"
               >
                 ご予約はこちら
-              </a>
+              </Link>
             </div>
           </nav>
         </div>

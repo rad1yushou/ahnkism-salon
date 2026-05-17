@@ -13,14 +13,14 @@ export default function CtaBannerSection() {
             ご予約はこちら
           </h2>
           <p className="text-sm font-light text-stone-500 leading-relaxed max-w-md mx-auto">
-            ご希望の店舗を選んで、HotPepper Beauty からオンラインでご予約いただけます。
+            店舗またはスタッフからお好みの方法でご予約いただけます。
             ご不明な点はお気軽にお問い合わせください。
           </p>
         </div>
         <ReservationCTA
-          href="/salon"
-          label="店舗を選んでご予約"
-          sub="心斎橋 labo / 堀江 elu / 本町 nit / 北堀江 olea"
+          href="/reservation"
+          label="ご予約はこちら"
+          sub="店舗・スタッフから選べます"
         />
       </Container>
     </section>
