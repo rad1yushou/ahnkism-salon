@@ -13,6 +13,7 @@ const QUICK_LINKS = [
   { href: '/admin/reasons',       label: '選ばれる理由管理', icon: '★', desc: 'トップページ「選ばれる理由」の編集' },
   { href: '/admin/results',       label: '施術実績管理',     icon: '◈', desc: 'トップページ「施術実績」の編集' },
   { href: '/admin/home-sections', label: 'ページ構成管理',   icon: '☰', desc: 'トップページのセクション表示順・公開設定' },
+  { href: '/admin/reviews',       label: '口コミ管理',       icon: '✦', desc: 'トップページ「口コミ」の編集' },
 ];
 
 export default function AdminDashboardPage() {
