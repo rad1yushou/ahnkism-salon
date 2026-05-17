@@ -11,6 +11,7 @@ const QUICK_LINKS = [
   { href: '/admin/menus',  label: 'メニュー管理', icon: '✂', desc: 'メニュー・料金・FAQの編集' },
   { href: '/admin/staff',   label: 'スタッフ管理',     icon: '👤', desc: 'スタッフプロフィールの編集' },
   { href: '/admin/reasons',       label: '選ばれる理由管理', icon: '★', desc: 'トップページ「選ばれる理由」の編集' },
+  { href: '/admin/results',       label: '施術実績管理',     icon: '◈', desc: 'トップページ「施術実績」の編集' },
   { href: '/admin/home-sections', label: 'ページ構成管理',   icon: '☰', desc: 'トップページのセクション表示順・公開設定' },
 ];
 

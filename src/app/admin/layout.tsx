@@ -19,6 +19,7 @@ const ADMIN_NAV = [
   { href: '/admin/menus',     label: 'メニュー管理',   icon: '✂' },
   { href: '/admin/staff',     label: 'スタッフ管理',   icon: '👤' },
   { href: '/admin/reasons',       label: '選ばれる理由',   icon: '★' },
+  { href: '/admin/results',       label: '施術実績',       icon: '◈' },
   { href: '/admin/home-sections', label: 'ページ構成',     icon: '☰' },
 ];
 
