@@ -18,7 +18,8 @@ const ADMIN_NAV = [
   { href: '/admin/salons',    label: '店舗管理',       icon: '🏠' },
   { href: '/admin/menus',     label: 'メニュー管理',   icon: '✂' },
   { href: '/admin/staff',     label: 'スタッフ管理',   icon: '👤' },
-  { href: '/admin/reasons',   label: '選ばれる理由',   icon: '★' },
+  { href: '/admin/reasons',       label: '選ばれる理由',   icon: '★' },
+  { href: '/admin/home-sections', label: 'ページ構成',     icon: '☰' },
 ];
 
 export default function AdminLayout({

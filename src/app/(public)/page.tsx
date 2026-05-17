@@ -10,6 +10,7 @@ import StaffSection from '@/components/sections/StaffSection';
 import ReviewsSection from '@/components/sections/ReviewsSection';
 import RecruitSection from '@/components/sections/RecruitSection';
 import CtaBannerSection from '@/components/sections/CtaBannerSection';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 export const metadata: Metadata = buildMetadata({
   title: SITE.fullName,
@@ -17,15 +18,46 @@ export const metadata: Metadata = buildMetadata({
   path: '/',
 });
 
-export default function HomePage() {
+const DEFAULT_SECTION_KEYS = ['reasons', 'salons', 'menus', 'beforeAfter', 'staff'];
+
+function renderSection(key: string) {
+  switch (key) {
+    case 'reasons':     return <Reasons key={key} />;
+    case 'salons':      return <SalonsSection key={key} />;
+    case 'menus':       return <MenusSection key={key} />;
+    case 'beforeAfter': return <BeforeAfterSection key={key} />;
+    case 'staff':       return <StaffSection key={key} />;
+    default:            return null;
+  }
+}
+
+export default async function HomePage() {
+  let sectionKeys: string[] = [];
+
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) {
+    // Supabase 未設定時のみフォールバック
+    sectionKeys = DEFAULT_SECTION_KEYS;
+  } else {
+    const { data, error } = await supabase
+      .from('home_sections')
+      .select('section_key')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true });
+
+    if (error) {
+      // 接続エラー時のみフォールバック
+      sectionKeys = DEFAULT_SECTION_KEYS;
+    } else {
+      // 成功時は DB の順序をそのまま使う（0件でもフォールバックしない）
+      sectionKeys = (data ?? []).map((r) => r.section_key);
+    }
+  }
+
   return (
     <>
       <Hero />
-      <Reasons />
-      <SalonsSection />
-      <MenusSection />
-      <BeforeAfterSection />
-      <StaffSection />
+      {sectionKeys.map((key) => renderSection(key))}
       <ReviewsSection />
       <RecruitSection />
       <CtaBannerSection />
