@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { buildMetadata } from '@/lib/metadata';
+import Image from 'next/image';
 import Container from '@/components/ui/Container';
 import SectionTitle from '@/components/ui/SectionTitle';
 import StaffCard from '@/components/cards/StaffCard';
@@ -13,13 +14,62 @@ export const metadata: Metadata = buildMetadata({
   path: '/reservation',
 });
 
+const ROLE_TARGETS = ['店長', '副店長', 'スタイリスト'];
+
+function matchesRole(role: string): boolean {
+  return ROLE_TARGETS.some((t) => role.includes(t));
+}
+
 type ReservationSalon = {
   slug: string;
+  shortName: string;
   name: string;
   description: string;
   nearestStation: string;
   hotpepperUrl: string;
+  imageUrl: string | null;
 };
+
+type SalonGroup = {
+  salonSlug: string;
+  salonName: string;
+  members: StaffMember[];
+};
+
+function groupStaffBySalon(staff: StaffMember[]): SalonGroup[] {
+  const salonOrder = SALONS.map((s) => s.slug);
+  const groupMap = new Map<string, StaffMember[]>();
+
+  for (const member of staff) {
+    const key = member.salonSlug || '';
+    if (!groupMap.has(key)) groupMap.set(key, []);
+    groupMap.get(key)!.push(member);
+  }
+
+  const groups: SalonGroup[] = [];
+
+  // SALONS の順番でグループを追加
+  for (const slug of salonOrder) {
+    const members = groupMap.get(slug);
+    if (members && members.length > 0) {
+      const salonName = SALONS.find((s) => s.slug === slug)?.name ?? slug;
+      groups.push({ salonSlug: slug, salonName, members });
+    }
+  }
+
+  // 所属未設定（空文字 or SALONS に存在しないスラッグ）を最後にまとめる
+  const unassigned: StaffMember[] = [];
+  for (const [slug, members] of groupMap.entries()) {
+    if (!salonOrder.includes(slug)) {
+      unassigned.push(...members);
+    }
+  }
+  if (unassigned.length > 0) {
+    groups.push({ salonSlug: '', salonName: '所属未設定', members: unassigned });
+  }
+
+  return groups;
+}
 
 export default async function ReservationPage() {
   // ---- 店舗データ取得 ----
@@ -29,54 +79,60 @@ export default async function ReservationPage() {
   if (!supabase) {
     salons = SALONS.map((s) => ({
       slug: s.slug,
+      shortName: s.shortName,
       name: s.name,
       description: s.description,
       nearestStation: s.nearestStation,
       hotpepperUrl: s.hotpepperUrl,
+      imageUrl: s.imageUrl ?? null,
     }));
   } else {
     const { data: salonData, error: salonError } = await supabase
       .from('salons')
-      .select('slug, name, description, nearest_station, hotpepper_url, sort_order, is_active')
+      .select('slug, short_name, name, description, nearest_station, hotpepper_url, image_url, sort_order, is_active')
       .eq('is_active', true)
       .order('sort_order', { ascending: true });
 
     if (salonError) {
       salons = SALONS.map((s) => ({
         slug: s.slug,
+        shortName: s.shortName,
         name: s.name,
         description: s.description,
         nearestStation: s.nearestStation,
         hotpepperUrl: s.hotpepperUrl,
+        imageUrl: s.imageUrl ?? null,
       }));
     } else {
       salons = (salonData ?? []).map((r) => ({
         slug: r.slug,
+        shortName: r.short_name ?? r.slug,
         name: r.name,
         description: r.description ?? '',
         nearestStation: r.nearest_station ?? '',
         hotpepperUrl: r.hotpepper_url ?? '',
+        imageUrl: r.image_url ?? null,
       }));
     }
   }
 
-  // ---- スタッフデータ取得（スタイリストのみ） ----
-  let stylists: StaffMember[] = [];
+  // ---- スタッフデータ取得（店長 / 副店長 / スタイリスト） ----
+  let targetStaff: StaffMember[] = [];
 
   if (!supabase) {
-    stylists = STAFF.filter((s) => s.role.includes('スタイリスト'));
+    targetStaff = STAFF.filter((s) => matchesRole(s.role));
   } else {
     const { data: staffData, error: staffError } = await supabase
       .from('staff')
       .select('slug, name, name_kana, role, salon_slug, bio, specialties, recommended_menu, instagram_url, tiktok_url, booking_url, image_url, sort_order, is_active')
       .eq('is_active', true)
-      .ilike('role', '%スタイリスト%')
+      .or('role.ilike.%スタイリスト%,role.ilike.%店長%,role.ilike.%副店長%')
       .order('sort_order', { ascending: true });
 
     if (staffError) {
-      stylists = STAFF.filter((s) => s.role.includes('スタイリスト'));
+      targetStaff = STAFF.filter((s) => matchesRole(s.role));
     } else {
-      stylists = (staffData ?? []).map((r) => {
+      targetStaff = (staffData ?? []).map((r) => {
         const salonName =
           SALONS.find((s) => s.slug === r.salon_slug)?.name ?? r.salon_slug ?? '';
         return {
@@ -97,6 +153,8 @@ export default async function ReservationPage() {
       });
     }
   }
+
+  const staffGroups = groupStaffBySalon(targetStaff);
 
   return (
     <main className="pt-16 sm:pt-20">
@@ -128,31 +186,51 @@ export default async function ReservationPage() {
             {salons.map((salon) => (
               <div
                 key={salon.slug}
-                className="border border-stone-200 bg-white p-6 flex flex-col"
+                className="border border-stone-200 bg-white flex flex-col"
               >
-                <div className="flex-1">
-                  <h2 className="text-base font-light tracking-wider text-stone-800 mb-1">
-                    {salon.name}
-                  </h2>
-                  {salon.nearestStation && (
-                    <p className="text-[11px] text-[#C9A96E] tracking-wider mb-3">
-                      {salon.nearestStation}
-                    </p>
+                {/* 店舗画像 */}
+                <div className="aspect-[4/3] bg-stone-100 overflow-hidden relative">
+                  {salon.imageUrl ? (
+                    <Image
+                      src={salon.imageUrl}
+                      alt={salon.name}
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-stone-300 text-sm tracking-widest">
+                      {salon.shortName.toUpperCase()}
+                    </div>
                   )}
-                  <p className="text-xs text-stone-500 leading-relaxed">
-                    {salon.description}
-                  </p>
                 </div>
-                {salon.hotpepperUrl && (
-                  <a
-                    href={salon.hotpepperUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-6 block text-center py-3 text-xs tracking-widest bg-[#C9A96E] text-white hover:bg-[#b8964f] transition-colors"
-                  >
-                    HotPepperで予約する ↗
-                  </a>
-                )}
+
+                {/* テキスト */}
+                <div className="p-6 flex flex-col flex-1">
+                  <div className="flex-1">
+                    <h2 className="text-base font-light tracking-wider text-stone-800 mb-1">
+                      {salon.name}
+                    </h2>
+                    {salon.nearestStation && (
+                      <p className="text-[11px] text-[#C9A96E] tracking-wider mb-3">
+                        {salon.nearestStation}
+                      </p>
+                    )}
+                    <p className="text-xs text-stone-500 leading-relaxed">
+                      {salon.description}
+                    </p>
+                  </div>
+                  {salon.hotpepperUrl && (
+                    <a
+                      href={salon.hotpepperUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-6 block text-center py-3 text-xs tracking-widest bg-[#C9A96E] text-white hover:bg-[#b8964f] transition-colors"
+                    >
+                      HotPepperで予約する ↗
+                    </a>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -167,15 +245,24 @@ export default async function ReservationPage() {
             title="スタッフから選ぶ"
             description="スタイリストのページでスタイル・施術動画を確認してからご予約いただけます。"
           />
-          {stylists.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-8">
-              {stylists.map((member) => (
-                <StaffCard key={member.slug} member={member} />
+          {staffGroups.length > 0 ? (
+            <div className="space-y-14">
+              {staffGroups.map((group) => (
+                <div key={group.salonSlug || 'unassigned'}>
+                  <p className="text-xs tracking-[0.25em] text-[#C9A96E] uppercase mb-6">
+                    {group.salonName}
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-8">
+                    {group.members.map((member) => (
+                      <StaffCard key={member.slug} member={member} />
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           ) : (
             <p className="text-xs text-stone-400 text-center py-8">
-              スタイリスト情報を準備中です。
+              スタッフ情報を準備中です。
             </p>
           )}
         </Container>
