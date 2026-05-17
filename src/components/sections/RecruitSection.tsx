@@ -1,7 +1,45 @@
 import Container from '@/components/ui/Container';
 import Button from '@/components/ui/Button';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 
-export default function RecruitSection() {
+// フォールバック用固定データ（Supabase 未設定・接続エラー時のみ使用）
+const FALLBACK_JOBS = [
+  { href: '/recruit/stylist',   label: 'スタイリスト募集' },
+  { href: '/recruit/eyelist',   label: 'アイリスト募集' },
+  { href: '/recruit/assistant', label: 'アシスタント募集' },
+];
+
+type JobItem = {
+  slug: string;
+  title: string;
+};
+
+export default async function RecruitSection() {
+  // null = フォールバック、[] = 取得成功0件
+  let jobs: JobItem[] | null = null;
+
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) {
+    jobs = null;
+  } else {
+    const { data, error } = await supabase
+      .from('recruit_jobs')
+      .select('slug, title')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true });
+
+    if (error) {
+      jobs = null;
+    } else {
+      jobs = data ?? [];
+    }
+  }
+
+  const buttons =
+    jobs === null
+      ? FALLBACK_JOBS.map((j) => ({ href: j.href, label: j.label }))
+      : jobs.map((j) => ({ href: `/recruit/${j.slug}`, label: j.title }));
+
   return (
     <section className="py-20 sm:py-28 bg-stone-900">
       <Container>
@@ -16,17 +54,20 @@ export default function RecruitSection() {
             AHNKISMグループでは、美容師・アイリストを随時募集しています。
             スタッフの技術と働きやすい環境を大切にしています。
           </p>
-          <div className="flex flex-col sm:flex-row justify-center gap-4">
-            <Button href="/recruit/stylist" variant="outline" className="border-stone-600 text-stone-300 hover:border-[#C9A96E] hover:text-[#C9A96E]">
-              スタイリスト募集
-            </Button>
-            <Button href="/recruit/eyelist" variant="outline" className="border-stone-600 text-stone-300 hover:border-[#C9A96E] hover:text-[#C9A96E]">
-              アイリスト募集
-            </Button>
-            <Button href="/recruit/assistant" variant="outline" className="border-stone-600 text-stone-300 hover:border-[#C9A96E] hover:text-[#C9A96E]">
-              アシスタント募集
-            </Button>
-          </div>
+          {buttons.length > 0 && (
+            <div className="flex flex-col sm:flex-row justify-center gap-4">
+              {buttons.map((btn) => (
+                <Button
+                  key={btn.href}
+                  href={btn.href}
+                  variant="outline"
+                  className="border-stone-600 text-stone-300 hover:border-[#C9A96E] hover:text-[#C9A96E]"
+                >
+                  {btn.label}
+                </Button>
+              ))}
+            </div>
+          )}
         </div>
       </Container>
     </section>

@@ -14,6 +14,7 @@ const QUICK_LINKS = [
   { href: '/admin/results',       label: '施術実績管理',     icon: '◈', desc: 'トップページ「施術実績」の編集' },
   { href: '/admin/home-sections', label: 'ページ構成管理',   icon: '☰', desc: 'トップページのセクション表示順・公開設定' },
   { href: '/admin/reviews',       label: '口コミ管理',       icon: '✦', desc: 'トップページ「口コミ」の編集' },
+  { href: '/admin/recruit',       label: '採用管理',         icon: '✉', desc: '採用職種の掲載・募集要項の編集' },
 ];
 
 export default function AdminDashboardPage() {

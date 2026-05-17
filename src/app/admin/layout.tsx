@@ -22,6 +22,7 @@ const ADMIN_NAV = [
   { href: '/admin/results',       label: '施術実績',       icon: '◈' },
   { href: '/admin/home-sections', label: 'ページ構成',     icon: '☰' },
   { href: '/admin/reviews',       label: '口コミ管理',     icon: '✦' },
+  { href: '/admin/recruit',       label: '採用管理',       icon: '✉' },
 ];
 
 export default function AdminLayout({
