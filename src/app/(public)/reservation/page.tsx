@@ -216,7 +216,7 @@ export default async function ReservationPage() {
                         {salon.nearestStation}
                       </p>
                     )}
-                    <p className="text-xs text-stone-500 leading-relaxed">
+                    <p className="text-xs text-stone-500 leading-relaxed whitespace-pre-line">
                       {salon.description}
                     </p>
                   </div>

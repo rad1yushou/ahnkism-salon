@@ -68,7 +68,7 @@ export default async function RecruitJobPage({
           <h1 className="text-3xl sm:text-4xl font-light tracking-wider text-stone-800 mb-6">
             {job.title}
           </h1>
-          <p className="text-sm text-stone-500 leading-relaxed mb-10">{job.description}</p>
+          <p className="text-sm text-stone-500 leading-relaxed mb-10 whitespace-pre-line">{job.description}</p>
           <div className="space-y-4 text-sm mb-12">
             {job.requirements.map((req, i) => (
               <div key={i} className="border border-stone-200 p-4">

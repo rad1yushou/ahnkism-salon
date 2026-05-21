@@ -110,7 +110,7 @@ export default async function Reasons() {
                   <h3 className="text-sm tracking-wider text-stone-800 font-light mb-2">
                     {r.title}
                   </h3>
-                  <p className="text-xs text-stone-500 leading-relaxed">
+                  <p className="text-xs text-stone-500 leading-relaxed whitespace-pre-line">
                     {r.description}
                   </p>
                 </div>

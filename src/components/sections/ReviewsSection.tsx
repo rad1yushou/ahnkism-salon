@@ -115,7 +115,7 @@ export default async function ReviewsSection() {
                     </span>
                   ))}
                 </div>
-                <p className="text-xs text-stone-600 leading-relaxed mb-4">{item.body}</p>
+                <p className="text-xs text-stone-600 leading-relaxed mb-4 whitespace-pre-line">{item.body}</p>
                 <div>
                   <p className="text-xs font-light text-stone-700">{item.display_name}</p>
                   {item.salon_label && (

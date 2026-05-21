@@ -171,7 +171,7 @@ export default async function RecruitPage() {
                     </div>
                   )}
                   {sec.body && (
-                    <p className="text-sm text-stone-500 leading-relaxed mb-5">{sec.body}</p>
+                    <p className="text-sm text-stone-500 leading-relaxed mb-5 whitespace-pre-line">{sec.body}</p>
                   )}
                   {sec.items.length > 0 && (
                     <ul className="space-y-2">
