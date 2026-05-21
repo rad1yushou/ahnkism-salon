@@ -16,6 +16,7 @@ type MenuDetailProps = {
 function getAspectClass(aspect: string | null): string {
   if (aspect === 'portrait') return 'aspect-[4/5]';
   if (aspect === 'square') return 'aspect-square';
+  if (aspect === 'vertical') return 'aspect-[9/16]';
   return 'aspect-video';
 }
 

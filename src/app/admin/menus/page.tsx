@@ -34,7 +34,7 @@ type Menu = {
   duration: string | null;
   media_url: string | null;
   media_type: 'image' | 'video' | null;
-  media_aspect: 'video' | 'portrait' | 'square';
+  media_aspect: 'video' | 'portrait' | 'square' | 'vertical';
   media_position: 'center' | 'top' | 'bottom' | 'left' | 'right';
   sort_order: number;
   is_active: boolean;
@@ -49,7 +49,7 @@ type EditForm = {
   duration: string | null;
   media_url: string | null;
   media_type: 'image' | 'video' | null;
-  media_aspect: 'video' | 'portrait' | 'square';
+  media_aspect: 'video' | 'portrait' | 'square' | 'vertical';
   media_position: 'center' | 'top' | 'bottom' | 'left' | 'right';
   sort_order: number;
   is_active: boolean;
@@ -219,7 +219,7 @@ export default function AdminMenusPage() {
           ...m,
           media_url: m.media_url ?? null,
           media_type: (m.media_type ?? null) as 'image' | 'video' | null,
-          media_aspect: (m.media_aspect ?? 'video') as 'video' | 'portrait' | 'square',
+          media_aspect: (m.media_aspect ?? 'video') as 'video' | 'portrait' | 'square' | 'vertical',
           media_position: (m.media_position ?? 'center') as 'center' | 'top' | 'bottom' | 'left' | 'right',
         }))
       );
@@ -766,6 +766,7 @@ export default function AdminMenusPage() {
                             { value: 'video', label: '16:9（横長）' },
                             { value: 'portrait', label: '4:5（縦長）' },
                             { value: 'square', label: '1:1（正方形）' },
+                            { value: 'vertical', label: '9:16（縦長）' },
                           ] as const).map(({ value, label }) => (
                             <label key={value} className="flex items-center gap-2 text-xs text-stone-600 cursor-pointer">
                               <input
