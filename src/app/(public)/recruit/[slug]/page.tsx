@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { buildMetadata } from '@/lib/metadata';
 import Container from '@/components/ui/Container';
+import Button from '@/components/ui/Button';
 import Breadcrumb from '@/components/seo/Breadcrumb';
-import ReservationCTA from '@/components/ui/ReservationCTA';
 import { SITE } from '@/constants/site';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
@@ -16,6 +16,17 @@ type Job = {
   requirements: Requirement[];
 };
 
+type ContactSettings = {
+  title: string;
+  body: string;
+  email: string;
+  phone: string;
+  line_url: string;
+  instagram_url: string;
+  button_label: string;
+  primary_url: string;
+};
+
 async function getJob(slug: string): Promise<Job | null> {
   const supabase = await createSupabaseServerClient();
   if (!supabase) return null;
@@ -26,6 +37,19 @@ async function getJob(slug: string): Promise<Job | null> {
     .eq('is_active', true)
     .single();
   return data ?? null;
+}
+
+async function getContact(): Promise<ContactSettings | null> {
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('recruit_contact_settings')
+    .select('title, body, email, phone, line_url, instagram_url, button_label, primary_url')
+    .eq('setting_key', 'default')
+    .eq('is_active', true)
+    .single();
+  if (error || !data) return null;
+  return data as ContactSettings;
 }
 
 export async function generateMetadata({
@@ -49,8 +73,21 @@ export default async function RecruitJobPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const job = await getJob(slug);
+  const [job, contact] = await Promise.all([getJob(slug), getContact()]);
   if (!job) notFound();
+
+  // ボタンリンク優先順: primary_url → mailto:email → line_url → instagram_url → mailto:SITE.email
+  const contactHref: string | null =
+    (contact?.primary_url) ||
+    (contact?.email ? `mailto:${contact.email}` : null) ||
+    (contact?.line_url) ||
+    (contact?.instagram_url) ||
+    (SITE.email ? `mailto:${SITE.email}` : null);
+
+  const contactLabel = contact?.button_label || '応募・お問い合わせはこちら';
+
+  // メール欄の表示: CMS の email、なければ SITE.email にフォールバック
+  const displayEmail = contact?.email || SITE.email;
 
   return (
     <>
@@ -76,17 +113,75 @@ export default async function RecruitJobPage({
                 <p className="text-stone-700">{req.value}</p>
               </div>
             ))}
-            <div className="border border-stone-200 p-4">
-              <p className="text-xs text-stone-400 mb-1">お問い合わせ</p>
-              <a
-                href={`mailto:${SITE.email}`}
-                className="text-stone-700 hover:text-[#C9A96E] transition-colors"
-              >
-                {SITE.email}
-              </a>
-            </div>
           </div>
-          <ReservationCTA label="採用について問い合わせる" sub="メールにてご連絡ください" />
+
+          {/* 問い合わせ先ブロック */}
+          <div className="border-t border-stone-100 pt-10">
+            <p className="text-[10px] tracking-[0.3em] text-[#C9A96E] uppercase mb-2">Contact</p>
+            <h2 className="text-xl font-light tracking-wider text-stone-800 mb-4">
+              {contact ? contact.title : '応募・お問い合わせ'}
+            </h2>
+            {contact?.body && (
+              <p className="text-sm text-stone-500 leading-relaxed mb-6 whitespace-pre-line">
+                {contact.body}
+              </p>
+            )}
+            <ul className="space-y-2 mb-6">
+              {displayEmail && (
+                <li className="text-xs text-stone-600">
+                  メール:{' '}
+                  <a
+                    href={`mailto:${displayEmail}`}
+                    className="hover:text-[#C9A96E] transition-colors"
+                  >
+                    {displayEmail}
+                  </a>
+                </li>
+              )}
+              {contact?.phone && (
+                <li className="text-xs text-stone-600">
+                  電話:{' '}
+                  <a
+                    href={`tel:${contact.phone}`}
+                    className="hover:text-[#C9A96E] transition-colors"
+                  >
+                    {contact.phone}
+                  </a>
+                </li>
+              )}
+              {contact?.line_url && (
+                <li className="text-xs text-stone-600">
+                  LINE:{' '}
+                  <a
+                    href={contact.line_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-[#C9A96E] transition-colors"
+                  >
+                    LINE公式アカウント
+                  </a>
+                </li>
+              )}
+              {contact?.instagram_url && (
+                <li className="text-xs text-stone-600">
+                  Instagram:{' '}
+                  <a
+                    href={contact.instagram_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-[#C9A96E] transition-colors"
+                  >
+                    Instagram
+                  </a>
+                </li>
+              )}
+            </ul>
+            {contactHref && (
+              <Button href={contactHref} variant="outline" external>
+                {contactLabel}
+              </Button>
+            )}
+          </div>
         </Container>
       </section>
     </>

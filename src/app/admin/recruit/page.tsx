@@ -469,7 +469,7 @@ export default function AdminRecruitPage() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const isConfigured = !!supabase;
 
-  const [activeTab, setActiveTab] = useState<'sections' | 'jobs'>('sections');
+  const [activeTab, setActiveTab] = useState<'sections' | 'jobs' | 'contact'>('sections');
   const [message, setMessage] = useState('');
 
   const showMessage = (msg: string) => {
@@ -816,6 +816,74 @@ export default function AdminRecruitPage() {
   };
 
   // ----------------------------------------------------------
+  // 問い合わせ先設定 state
+  // ----------------------------------------------------------
+  type ContactForm = {
+    title: string;
+    body: string;
+    email: string;
+    phone: string;
+    line_url: string;
+    instagram_url: string;
+    button_label: string;
+    primary_url: string;
+    is_active: boolean;
+  };
+
+  const EMPTY_CONTACT_FORM: ContactForm = {
+    title: '応募・お問い合わせ',
+    body: '',
+    email: '',
+    phone: '',
+    line_url: '',
+    instagram_url: '',
+    button_label: '応募・お問い合わせはこちら',
+    primary_url: '',
+    is_active: true,
+  };
+
+  const [contactForm, setContactForm] = useState<ContactForm>({ ...EMPTY_CONTACT_FORM });
+  const [loadingContact, setLoadingContact] = useState(true);
+  const [savingContact, setSavingContact] = useState(false);
+
+  const loadContact = useCallback(async () => {
+    if (!supabase) { setLoadingContact(false); return; }
+    setLoadingContact(true);
+    const { data } = await supabase
+      .from('recruit_contact_settings')
+      .select('title, body, email, phone, line_url, instagram_url, button_label, primary_url, is_active')
+      .eq('setting_key', 'default')
+      .maybeSingle();
+    if (data) {
+      setContactForm({
+        title: data.title,
+        body: data.body,
+        email: data.email,
+        phone: data.phone,
+        line_url: data.line_url,
+        instagram_url: data.instagram_url,
+        button_label: data.button_label,
+        primary_url: data.primary_url,
+        is_active: data.is_active,
+      });
+    }
+    setLoadingContact(false);
+  }, [supabase]);
+
+  useEffect(() => { loadContact(); }, [loadContact]);
+
+  const saveContact = async () => {
+    if (!supabase) return;
+    setSavingContact(true);
+    const { error } = await supabase
+      .from('recruit_contact_settings')
+      .upsert({ setting_key: 'default', ...contactForm }, { onConflict: 'setting_key' });
+    setSavingContact(false);
+    if (error) { showMessage(`保存失敗: ${error.message}`); return; }
+    showMessage('問い合わせ先を保存しました');
+  };
+
+  // ----------------------------------------------------------
   // レンダー
   // ----------------------------------------------------------
   return (
@@ -853,13 +921,23 @@ export default function AdminRecruitPage() {
         </button>
         <button
           onClick={() => setActiveTab('jobs')}
-          className={`pb-3 px-1 text-xs tracking-wider border-b-2 transition-colors ${
+          className={`pb-3 px-1 mr-6 text-xs tracking-wider border-b-2 transition-colors ${
             activeTab === 'jobs'
               ? 'border-stone-800 text-stone-800'
               : 'border-transparent text-stone-400 hover:text-stone-600'
           }`}
         >
           募集職種
+        </button>
+        <button
+          onClick={() => setActiveTab('contact')}
+          className={`pb-3 px-1 text-xs tracking-wider border-b-2 transition-colors ${
+            activeTab === 'contact'
+              ? 'border-stone-800 text-stone-800'
+              : 'border-transparent text-stone-400 hover:text-stone-600'
+          }`}
+        >
+          問い合わせ先
         </button>
       </div>
 
@@ -1223,6 +1301,117 @@ export default function AdminRecruitPage() {
                 </section>
               ))}
             </div>
+          )}
+        </div>
+      )}
+
+      {/* ========== 問い合わせ先 タブ ========== */}
+      {activeTab === 'contact' && (
+        <div className="space-y-4">
+          <p className="text-xs text-stone-400">
+            採用職種ページ下部に表示する問い合わせ先を管理します。採用職種すべてで共通です。
+          </p>
+
+          {loadingContact ? (
+            <p className="text-xs text-stone-400">読み込み中...</p>
+          ) : (
+            <section className="bg-white border border-stone-200 rounded-lg">
+              <div className="px-5 py-5 space-y-5">
+                <div>
+                  <p className="text-[10px] tracking-widest text-stone-400 uppercase mb-3">見出し・説明</p>
+                  <div className="space-y-3">
+                    <Field
+                      label="見出し"
+                      value={contactForm.title}
+                      onChange={(v) => setContactForm((p) => ({ ...p, title: v }))}
+                      placeholder="応募・お問い合わせ"
+                    />
+                    <Field
+                      label="説明文（改行反映）"
+                      value={contactForm.body}
+                      onChange={(v) => setContactForm((p) => ({ ...p, body: v }))}
+                      placeholder="サロン見学・面接希望の方は下記よりご連絡ください。"
+                      rows={3}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-[10px] tracking-widest text-stone-400 uppercase mb-3">連絡先</p>
+                  <div className="space-y-3">
+                    <Field
+                      label="メール"
+                      value={contactForm.email}
+                      onChange={(v) => setContactForm((p) => ({ ...p, email: v }))}
+                      placeholder="info@example.com"
+                      type="email"
+                    />
+                    <Field
+                      label="電話番号"
+                      value={contactForm.phone}
+                      onChange={(v) => setContactForm((p) => ({ ...p, phone: v }))}
+                      placeholder="06-0000-0000"
+                    />
+                    <Field
+                      label="LINE URL"
+                      value={contactForm.line_url}
+                      onChange={(v) => setContactForm((p) => ({ ...p, line_url: v }))}
+                      placeholder="https://lin.ee/..."
+                    />
+                    <Field
+                      label="Instagram URL"
+                      value={contactForm.instagram_url}
+                      onChange={(v) => setContactForm((p) => ({ ...p, instagram_url: v }))}
+                      placeholder="https://www.instagram.com/..."
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-[10px] tracking-widest text-stone-400 uppercase mb-3">ボタン</p>
+                  <div className="space-y-3">
+                    <Field
+                      label="ボタン文言"
+                      value={contactForm.button_label}
+                      onChange={(v) => setContactForm((p) => ({ ...p, button_label: v }))}
+                      placeholder="応募・お問い合わせはこちら"
+                    />
+                    <Field
+                      label="優先リンク URL（空の場合はメールの mailto を使用）"
+                      value={contactForm.primary_url}
+                      onChange={(v) => setContactForm((p) => ({ ...p, primary_url: v }))}
+                      placeholder="https://..."
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-[10px] tracking-widest text-stone-400 uppercase mb-3">表示設定</p>
+                  <div className="flex items-center gap-2">
+                    <input
+                      id="contact_is_active"
+                      type="checkbox"
+                      checked={contactForm.is_active}
+                      onChange={(e) => setContactForm((p) => ({ ...p, is_active: e.target.checked }))}
+                      className="rounded border-stone-300"
+                    />
+                    <label htmlFor="contact_is_active" className="text-xs text-stone-600">
+                      公開する（チェックを外すと非表示・SITE.email にフォールバック）
+                    </label>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-stone-100">
+                  <button
+                    onClick={saveContact}
+                    disabled={!isConfigured || savingContact}
+                    className="px-4 py-1.5 rounded bg-green-500 text-white text-xs hover:bg-green-600 transition-colors disabled:opacity-40"
+                  >
+                    {savingContact ? '保存中...' : '保存'}
+                  </button>
+                </div>
+              </div>
+            </section>
           )}
         </div>
       )}
