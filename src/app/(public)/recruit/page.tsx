@@ -179,7 +179,8 @@ export default async function RecruitPage() {
           <Container narrow>
             <div className="space-y-14">
               {displaySections.map((sec, i) => {
-                const isSide = (sec.media_layout ?? 'top') === 'side' && !!sec.media_url;
+                const layout = sec.media_layout === 'side' ? 'left' : (sec.media_layout ?? 'top');
+                const isSide = (layout === 'left' || layout === 'right') && !!sec.media_url;
                 const aspectClass = getAspectClass(sec.media_aspect);
                 const positionClass = getPositionClass(sec.media_position);
 
@@ -229,12 +230,21 @@ export default async function RecruitPage() {
                       {sec.title}
                     </h2>
                     {isSide ? (
-                      <div className="flex flex-col sm:flex-row gap-8 items-start">
+                      <div className={`flex gap-8 items-start ${layout === 'right' ? 'flex-col-reverse sm:flex-row-reverse' : 'flex-col sm:flex-row'}`}>
                         <div className={`w-full sm:w-2/5 shrink-0 ${aspectClass} bg-stone-100 overflow-hidden relative`}>
                           {mediaEl}
                         </div>
                         <div className="flex-1">{textEl}</div>
                       </div>
+                    ) : layout === 'bottom' ? (
+                      <>
+                        {textEl}
+                        {sec.media_url && (
+                          <div className={`${aspectClass} bg-stone-100 overflow-hidden relative mt-5`}>
+                            {mediaEl}
+                          </div>
+                        )}
+                      </>
                     ) : (
                       <>
                         {sec.media_url && (

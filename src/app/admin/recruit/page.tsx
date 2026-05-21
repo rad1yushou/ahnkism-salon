@@ -81,7 +81,7 @@ type RecruitSection = {
   items: string[];
   media_url: string | null;
   media_type: 'image' | 'video' | null;
-  media_layout: 'top' | 'side';
+  media_layout: 'top' | 'bottom' | 'left' | 'right';
   media_aspect: 'video' | 'portrait' | 'square';
   media_position: 'center' | 'top' | 'bottom' | 'left' | 'right';
   sort_order: number;
@@ -95,7 +95,7 @@ type SectionForm = {
   items: string[];
   media_url: string | null;
   media_type: 'image' | 'video' | null;
-  media_layout: 'top' | 'side';
+  media_layout: 'top' | 'bottom' | 'left' | 'right';
   media_aspect: 'video' | 'portrait' | 'square';
   media_position: 'center' | 'top' | 'bottom' | 'left' | 'right';
   sort_order: number;
@@ -124,7 +124,7 @@ function toSectionForm(s: RecruitSection): SectionForm {
     items: s.items,
     media_url: s.media_url,
     media_type: s.media_type,
-    media_layout: s.media_layout,
+    media_layout: ((s.media_layout as string) === 'side' ? 'left' : s.media_layout) as SectionForm['media_layout'],
     media_aspect: s.media_aspect,
     media_position: s.media_position,
     sort_order: s.sort_order,
@@ -278,29 +278,25 @@ function SectionFormFields({
             <label className="block text-[10px] tracking-widest text-stone-500 mb-2">
               画像レイアウト
             </label>
-            <div className="flex gap-6">
-              <label className="flex items-center gap-2 text-xs text-stone-600 cursor-pointer">
-                <input
-                  type="radio"
-                  name={`media_layout_${idSuffix}`}
-                  value="top"
-                  checked={f.media_layout === 'top'}
-                  onChange={() => onChange('media_layout', 'top')}
-                  className="accent-stone-600"
-                />
-                上に大きく表示（top）
-              </label>
-              <label className="flex items-center gap-2 text-xs text-stone-600 cursor-pointer">
-                <input
-                  type="radio"
-                  name={`media_layout_${idSuffix}`}
-                  value="side"
-                  checked={f.media_layout === 'side'}
-                  onChange={() => onChange('media_layout', 'side')}
-                  className="accent-stone-600"
-                />
-                本文の横に表示（side）
-              </label>
+            <div className="flex flex-wrap gap-6">
+              {([
+                { value: 'top',    label: '上に表示' },
+                { value: 'bottom', label: '下に表示' },
+                { value: 'left',   label: '左に表示（本文は右）' },
+                { value: 'right',  label: '右に表示（本文は左）' },
+              ] as const).map(({ value, label }) => (
+                <label key={value} className="flex items-center gap-2 text-xs text-stone-600 cursor-pointer">
+                  <input
+                    type="radio"
+                    name={`media_layout_${idSuffix}`}
+                    value={value}
+                    checked={f.media_layout === value}
+                    onChange={() => onChange('media_layout', value)}
+                    className="accent-stone-600"
+                  />
+                  {label}
+                </label>
+              ))}
             </div>
           </div>
           <div>
@@ -588,7 +584,7 @@ export default function AdminRecruitPage() {
           items: Array.isArray(s.items) ? s.items : [],
           media_url: s.media_url ?? null,
           media_type: s.media_type ?? null,
-          media_layout: ((s.media_layout ?? 'top') as 'top' | 'side'),
+          media_layout: ((s.media_layout === 'side' ? 'left' : (s.media_layout ?? 'top')) as 'top' | 'bottom' | 'left' | 'right'),
           media_aspect: ((s.media_aspect ?? 'video') as 'video' | 'portrait' | 'square'),
           media_position: ((s.media_position ?? 'center') as 'center' | 'top' | 'bottom' | 'left' | 'right'),
         }))
