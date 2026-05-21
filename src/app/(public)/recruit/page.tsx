@@ -1,9 +1,11 @@
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import { buildMetadata } from '@/lib/metadata';
 import Container from '@/components/ui/Container';
 import SectionTitle from '@/components/ui/SectionTitle';
 import Button from '@/components/ui/Button';
 import Breadcrumb from '@/components/seo/Breadcrumb';
+import LazyAutoPlayVideo from '@/components/ui/LazyAutoPlayVideo';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 export const metadata: Metadata = buildMetadata({
@@ -18,6 +20,8 @@ const FALLBACK_SECTIONS = [
     title: '採用メッセージ',
     body: 'AHNKISMグループでは、技術と人間性を兼ね備えたスタッフが共に成長できる環境を大切にしています。スタイリスト・アイリスト・アシスタントそれぞれのキャリアを、私たちと一緒に築いていきませんか。あなたの「なりたい自分」を全力でサポートします。',
     items: [] as string[],
+    media_url: null as string | null,
+    media_type: null as string | null,
   },
   {
     title: 'AHNKISMで働く魅力',
@@ -29,6 +33,8 @@ const FALLBACK_SECTIONS = [
       '大阪・心斎橋・堀江の好立地サロン',
       'スタッフ同士の距離が近く、チームワーク抜群',
     ],
+    media_url: null as string | null,
+    media_type: null as string | null,
   },
   {
     title: '教育システム',
@@ -39,6 +45,8 @@ const FALLBACK_SECTIONS = [
       '薬剤知識・トレンド情報の定期勉強会',
       '先輩スタイリストによるマンツーマン指導',
     ],
+    media_url: null as string | null,
+    media_type: null as string | null,
   },
   {
     title: '大切にしていること',
@@ -49,6 +57,8 @@ const FALLBACK_SECTIONS = [
       'トレンドを追い続ける向上心',
       '技術と接客の両立',
     ],
+    media_url: null as string | null,
+    media_type: null as string | null,
   },
 ];
 
@@ -62,6 +72,8 @@ type SectionItem = {
   title: string;
   body: string;
   items: string[];
+  media_url: string | null;
+  media_type: string | null;
 };
 
 type JobItem = {
@@ -80,7 +92,7 @@ export default async function RecruitPage() {
     const [secRes, jobRes] = await Promise.all([
       supabase
         .from('recruit_sections')
-        .select('title, body, items')
+        .select('title, body, items, media_url, media_type')
         .eq('is_active', true)
         .order('sort_order', { ascending: true }),
       supabase
@@ -100,6 +112,8 @@ export default async function RecruitPage() {
           title: s.title,
           body: s.body,
           items: Array.isArray(s.items) ? (s.items as string[]) : [],
+          media_url: s.media_url ?? null,
+          media_type: s.media_type ?? null,
         }));
 
   const cards =
@@ -138,6 +152,24 @@ export default async function RecruitPage() {
                   <h2 className="text-xl font-light tracking-wider text-stone-800 mb-4">
                     {sec.title}
                   </h2>
+                  {sec.media_url && (
+                    <div className="aspect-video bg-stone-100 overflow-hidden relative mb-5">
+                      {sec.media_type === 'video' ? (
+                        <LazyAutoPlayVideo
+                          src={sec.media_url}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <Image
+                          src={sec.media_url}
+                          alt={sec.title}
+                          fill
+                          className="object-cover"
+                          unoptimized
+                        />
+                      )}
+                    </div>
+                  )}
                   {sec.body && (
                     <p className="text-sm text-stone-500 leading-relaxed mb-5">{sec.body}</p>
                   )}

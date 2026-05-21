@@ -1,10 +1,27 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import Image from 'next/image';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
 // ============================================================
-// 共通型・定数
+// メディア定数
+// ============================================================
+const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+const IMAGE_MAX_SIZE = 5 * 1024 * 1024;
+const MEDIA_VIDEO_TYPES = ['video/mp4', 'video/quicktime', 'video/webm'];
+const MEDIA_MAX_VIDEO_SIZE = 50 * 1024 * 1024;
+const BUCKET = 'ahnkism-public';
+
+function extractStoragePath(url: string): string | null {
+  const marker = `/object/public/${BUCKET}/`;
+  const idx = url.indexOf(marker);
+  if (idx === -1) return null;
+  return url.slice(idx + marker.length);
+}
+
+// ============================================================
+// 共通コンポーネント
 // ============================================================
 const inputBase =
   'w-full border border-stone-300 rounded px-3 py-1.5 text-xs text-stone-800 focus:outline-none focus:border-stone-500 bg-white';
@@ -62,6 +79,8 @@ type RecruitSection = {
   title: string;
   body: string;
   items: string[];
+  media_url: string | null;
+  media_type: 'image' | 'video' | null;
   sort_order: number;
   is_active: boolean;
 };
@@ -71,6 +90,8 @@ type SectionForm = {
   title: string;
   body: string;
   items: string[];
+  media_url: string | null;
+  media_type: 'image' | 'video' | null;
   sort_order: number;
   is_active: boolean;
 };
@@ -80,6 +101,8 @@ const EMPTY_SECTION_FORM: SectionForm = {
   title: '',
   body: '',
   items: [],
+  media_url: null,
+  media_type: null,
   sort_order: 0,
   is_active: true,
 };
@@ -90,6 +113,8 @@ function toSectionForm(s: RecruitSection): SectionForm {
     title: s.title,
     body: s.body,
     items: s.items,
+    media_url: s.media_url,
+    media_type: s.media_type,
     sort_order: s.sort_order,
     is_active: s.is_active,
   };
@@ -430,11 +455,13 @@ export default function AdminRecruitPage() {
   const [sections, setSections] = useState<RecruitSection[]>([]);
   const [loadingSec, setLoadingSec] = useState(true);
   const [savingSec, setSavingSec] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [editingSecId, setEditingSecId] = useState<string | null>(null);
   const [secForm, setSecForm] = useState<SectionForm | null>(null);
   const [isAddingNewSec, setIsAddingNewSec] = useState(false);
   const [newSecForm, setNewSecForm] = useState<SectionForm>({ ...EMPTY_SECTION_FORM });
   const [savingNewSec, setSavingNewSec] = useState(false);
+  const mediaFileRef = useRef<HTMLInputElement>(null);
 
   const loadSections = useCallback(async () => {
     if (!supabase) { setLoadingSec(false); return; }
@@ -450,6 +477,8 @@ export default function AdminRecruitPage() {
         (data ?? []).map((s) => ({
           ...s,
           items: Array.isArray(s.items) ? s.items : [],
+          media_url: s.media_url ?? null,
+          media_type: s.media_type ?? null,
         }))
       );
     }
@@ -537,10 +566,74 @@ export default function AdminRecruitPage() {
   const deleteSec = async (s: RecruitSection) => {
     if (!supabase) return;
     if (!window.confirm(`「${s.title}」を削除しますか？この操作は取り消せません。`)) return;
+    if (s.media_url) {
+      const path = extractStoragePath(s.media_url);
+      if (path) await supabase.storage.from(BUCKET).remove([path]);
+    }
     const { error } = await supabase.from('recruit_sections').delete().eq('id', s.id);
     if (error) { showMessage(`削除失敗: ${error.message}`); return; }
     showMessage(`「${s.title}」を削除しました`);
     if (editingSecId === s.id) cancelEditSec();
+    await loadSections();
+  };
+
+  const uploadMedia = async (file: File, sec: RecruitSection) => {
+    if (!supabase) return;
+    const isImage = IMAGE_TYPES.includes(file.type);
+    const isVideo = MEDIA_VIDEO_TYPES.includes(file.type);
+    if (!isImage && !isVideo) {
+      showMessage('jpg / png / webp / gif / mp4 / mov / webm のみアップロードできます');
+      return;
+    }
+    if (isImage && file.size > IMAGE_MAX_SIZE) { showMessage('画像のサイズは 5MB 以下にしてください'); return; }
+    if (isVideo && file.size > MEDIA_MAX_VIDEO_SIZE) { showMessage('動画のサイズは 50MB 以下にしてください'); return; }
+
+    setUploading(true);
+    try {
+      const ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg';
+      const path = `recruit-sections/${sec.id}/${Date.now()}.${ext}`;
+      const { error: uploadErr } = await supabase.storage.from(BUCKET).upload(path, file);
+      if (uploadErr) { showMessage(`アップロード失敗: ${uploadErr.message}`); return; }
+
+      const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(path);
+
+      if (sec.media_url) {
+        const oldPath = extractStoragePath(sec.media_url);
+        if (oldPath) await supabase.storage.from(BUCKET).remove([oldPath]);
+      }
+
+      const mediaType: 'image' | 'video' = isVideo ? 'video' : 'image';
+      const { error: dbErr } = await supabase
+        .from('recruit_sections')
+        .update({ media_url: publicUrl, media_type: mediaType })
+        .eq('id', sec.id);
+      if (dbErr) { showMessage(`DB保存失敗: ${dbErr.message}`); return; }
+
+      setSecField('media_url', publicUrl);
+      setSecField('media_type', mediaType);
+      showMessage('メディアをアップロードしました');
+      await loadSections();
+    } finally {
+      setUploading(false);
+      if (mediaFileRef.current) mediaFileRef.current.value = '';
+    }
+  };
+
+  const deleteMedia = async (sec: RecruitSection) => {
+    if (!supabase) return;
+    if (!window.confirm('このメディアを削除しますか？')) return;
+    if (sec.media_url) {
+      const path = extractStoragePath(sec.media_url);
+      if (path) await supabase.storage.from(BUCKET).remove([path]);
+    }
+    const { error } = await supabase
+      .from('recruit_sections')
+      .update({ media_url: null, media_type: null })
+      .eq('id', sec.id);
+    if (error) { showMessage(`削除失敗: ${error.message}`); return; }
+    setSecField('media_url', null);
+    setSecField('media_type', null);
+    showMessage('メディアを削除しました');
     await loadSections();
   };
 
@@ -718,7 +811,7 @@ export default function AdminRecruitPage() {
       {activeTab === 'sections' && (
         <div className="space-y-4">
           <p className="text-xs text-stone-400">
-            採用ページ上部に表示するセクション（採用メッセージ・働く魅力・教育システムなど）を管理します。
+            採用ページ上部に表示するセクションを管理します。各セクションに画像または動画を1つ追加できます。
           </p>
 
           {/* 新規追加フォーム */}
@@ -767,6 +860,20 @@ export default function AdminRecruitPage() {
             <p className="text-xs text-stone-400">セクションがありません</p>
           ) : (
             <div className="space-y-4">
+              {/* hidden file input（編集中セクション共通） */}
+              <input
+                ref={mediaFileRef}
+                type="file"
+                accept=".jpg,.jpeg,.png,.webp,.gif,.mp4,.mov,.webm"
+                className="hidden"
+                disabled={!isConfigured || uploading}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  const sec = sections.find((s) => s.id === editingSecId);
+                  if (file && sec) uploadMedia(file, sec);
+                }}
+              />
+
               {sections.map((s) => (
                 <section key={s.id} className="bg-white border border-stone-200 rounded-lg">
                   <div className="flex items-center justify-between px-5 py-4">
@@ -781,7 +888,7 @@ export default function AdminRecruitPage() {
                         <p className="text-[10px] text-stone-400 tracking-wider mt-0.5">
                           key: {s.section_key}
                           {`　sort: ${s.sort_order}`}
-                          {s.items.length > 0 && `　箇条書き: ${s.items.length}件`}
+                          {s.media_type && `　${s.media_type}`}
                         </p>
                       </div>
                     </div>
@@ -826,6 +933,56 @@ export default function AdminRecruitPage() {
                   {editingSecId === s.id && secForm && (
                     <div className="border-t border-stone-100 px-5 py-5 space-y-5">
                       <SectionFormFields f={secForm} onChange={setSecField} idSuffix={s.id} />
+
+                      {/* 画像 / 動画 */}
+                      <div>
+                        <p className="text-[10px] tracking-widest text-stone-400 uppercase mb-3">画像 / 動画</p>
+                        {secForm.media_url && (
+                          <div className="mb-3">
+                            <div className="w-full aspect-video bg-stone-100 rounded overflow-hidden relative mb-2">
+                              {secForm.media_type === 'video' ? (
+                                <video
+                                  src={secForm.media_url}
+                                  className="w-full h-full object-cover"
+                                  muted
+                                  playsInline
+                                />
+                              ) : (
+                                <Image
+                                  src={secForm.media_url}
+                                  alt={secForm.title}
+                                  fill
+                                  className="object-cover"
+                                  unoptimized
+                                />
+                              )}
+                            </div>
+                            <button
+                              onClick={() => deleteMedia(s)}
+                              disabled={!isConfigured || uploading}
+                              className="text-[10px] py-1 px-2 border border-red-300 text-red-500 hover:bg-red-50 rounded transition-colors disabled:opacity-40"
+                            >
+                              メディアを削除
+                            </button>
+                          </div>
+                        )}
+                        <button
+                          onClick={() => mediaFileRef.current?.click()}
+                          disabled={!isConfigured || uploading}
+                          className="text-[10px] py-1 px-2 border border-stone-300 text-stone-600 hover:bg-stone-50 rounded transition-colors disabled:opacity-40"
+                        >
+                          {uploading
+                            ? 'アップロード中...'
+                            : secForm.media_url
+                            ? 'メディアを差し替え'
+                            : 'メディアをアップロード'}
+                        </button>
+                        <p className="text-[10px] text-stone-400 mt-1">
+                          jpg / png / webp / gif（5MB以下）、mp4 / mov / webm（50MB以下）
+                        </p>
+                      </div>
+
+                      {/* 保存・キャンセル */}
                       <div className="flex items-center gap-3 pt-2 border-t border-stone-100">
                         <button
                           onClick={() => saveEditSec(s.id)}
