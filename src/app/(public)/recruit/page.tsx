@@ -23,6 +23,8 @@ const FALLBACK_SECTIONS = [
     media_url: null as string | null,
     media_type: null as string | null,
     media_layout: null as string | null,
+    media_aspect: null as string | null,
+    media_position: null as string | null,
   },
   {
     title: 'AHNKISMで働く魅力',
@@ -37,6 +39,8 @@ const FALLBACK_SECTIONS = [
     media_url: null as string | null,
     media_type: null as string | null,
     media_layout: null as string | null,
+    media_aspect: null as string | null,
+    media_position: null as string | null,
   },
   {
     title: '教育システム',
@@ -50,6 +54,8 @@ const FALLBACK_SECTIONS = [
     media_url: null as string | null,
     media_type: null as string | null,
     media_layout: null as string | null,
+    media_aspect: null as string | null,
+    media_position: null as string | null,
   },
   {
     title: '大切にしていること',
@@ -63,6 +69,8 @@ const FALLBACK_SECTIONS = [
     media_url: null as string | null,
     media_type: null as string | null,
     media_layout: null as string | null,
+    media_aspect: null as string | null,
+    media_position: null as string | null,
   },
 ];
 
@@ -79,6 +87,8 @@ type SectionItem = {
   media_url: string | null;
   media_type: string | null;
   media_layout: string | null;
+  media_aspect: string | null;
+  media_position: string | null;
 };
 
 type JobItem = {
@@ -86,6 +96,22 @@ type JobItem = {
   title: string;
   description: string;
 };
+
+// アスペクト比クラスを返す
+function getAspectClass(media_aspect: string | null): string {
+  if (media_aspect === 'portrait') return 'aspect-[4/5]';
+  if (media_aspect === 'square') return 'aspect-square';
+  return 'aspect-video'; // null / 'video' → 16:9
+}
+
+// object-position クラスを返す
+function getPositionClass(media_position: string | null): string {
+  if (media_position === 'top') return 'object-top';
+  if (media_position === 'bottom') return 'object-bottom';
+  if (media_position === 'left') return 'object-left';
+  if (media_position === 'right') return 'object-right';
+  return 'object-center'; // null / 'center'
+}
 
 export default async function RecruitPage() {
   // null = フォールバック、[] = 取得成功0件
@@ -97,7 +123,7 @@ export default async function RecruitPage() {
     const [secRes, jobRes] = await Promise.all([
       supabase
         .from('recruit_sections')
-        .select('title, body, items, media_url, media_type, media_layout')
+        .select('title, body, items, media_url, media_type, media_layout, media_aspect, media_position')
         .eq('is_active', true)
         .order('sort_order', { ascending: true }),
       supabase
@@ -120,6 +146,8 @@ export default async function RecruitPage() {
           media_url: s.media_url ?? null,
           media_type: s.media_type ?? null,
           media_layout: s.media_layout ?? null,
+          media_aspect: s.media_aspect ?? null,
+          media_position: s.media_position ?? null,
         }));
 
   const cards =
@@ -152,19 +180,21 @@ export default async function RecruitPage() {
             <div className="space-y-14">
               {displaySections.map((sec, i) => {
                 const isSide = (sec.media_layout ?? 'top') === 'side' && !!sec.media_url;
+                const aspectClass = getAspectClass(sec.media_aspect);
+                const positionClass = getPositionClass(sec.media_position);
 
                 const mediaEl = sec.media_url ? (
                   sec.media_type === 'video' ? (
                     <LazyAutoPlayVideo
                       src={sec.media_url}
-                      className="w-full h-full object-cover"
+                      className={`w-full h-full object-cover ${positionClass}`}
                     />
                   ) : (
                     <Image
                       src={sec.media_url}
                       alt={sec.title}
                       fill
-                      className="object-cover"
+                      className={`object-cover ${positionClass}`}
                       unoptimized
                     />
                   )
@@ -200,7 +230,7 @@ export default async function RecruitPage() {
                     </h2>
                     {isSide ? (
                       <div className="flex flex-col sm:flex-row gap-8 items-start">
-                        <div className="w-full sm:w-2/5 shrink-0 aspect-video bg-stone-100 overflow-hidden relative">
+                        <div className={`w-full sm:w-2/5 shrink-0 ${aspectClass} bg-stone-100 overflow-hidden relative`}>
                           {mediaEl}
                         </div>
                         <div className="flex-1">{textEl}</div>
@@ -208,7 +238,7 @@ export default async function RecruitPage() {
                     ) : (
                       <>
                         {sec.media_url && (
-                          <div className="aspect-video bg-stone-100 overflow-hidden relative mb-5">
+                          <div className={`${aspectClass} bg-stone-100 overflow-hidden relative mb-5`}>
                             {mediaEl}
                           </div>
                         )}

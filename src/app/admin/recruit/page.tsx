@@ -82,6 +82,8 @@ type RecruitSection = {
   media_url: string | null;
   media_type: 'image' | 'video' | null;
   media_layout: 'top' | 'side';
+  media_aspect: 'video' | 'portrait' | 'square';
+  media_position: 'center' | 'top' | 'bottom' | 'left' | 'right';
   sort_order: number;
   is_active: boolean;
 };
@@ -94,6 +96,8 @@ type SectionForm = {
   media_url: string | null;
   media_type: 'image' | 'video' | null;
   media_layout: 'top' | 'side';
+  media_aspect: 'video' | 'portrait' | 'square';
+  media_position: 'center' | 'top' | 'bottom' | 'left' | 'right';
   sort_order: number;
   is_active: boolean;
 };
@@ -106,6 +110,8 @@ const EMPTY_SECTION_FORM: SectionForm = {
   media_url: null,
   media_type: null,
   media_layout: 'top',
+  media_aspect: 'video',
+  media_position: 'center',
   sort_order: 0,
   is_active: true,
 };
@@ -119,6 +125,8 @@ function toSectionForm(s: RecruitSection): SectionForm {
     media_url: s.media_url,
     media_type: s.media_type,
     media_layout: s.media_layout,
+    media_aspect: s.media_aspect,
+    media_position: s.media_position,
     sort_order: s.sort_order,
     is_active: s.is_active,
   };
@@ -294,6 +302,46 @@ function SectionFormFields({
                 本文の横に表示（side）
               </label>
             </div>
+          </div>
+          <div>
+            <label className="block text-[10px] tracking-widest text-stone-500 mb-2">
+              画像比率
+            </label>
+            <div className="flex gap-6">
+              {([
+                { value: 'video',    label: '16:9（横長）' },
+                { value: 'portrait', label: '4:5（縦長）' },
+                { value: 'square',   label: '1:1（正方形）' },
+              ] as const).map(({ value, label }) => (
+                <label key={value} className="flex items-center gap-2 text-xs text-stone-600 cursor-pointer">
+                  <input
+                    type="radio"
+                    name={`media_aspect_${idSuffix}`}
+                    value={value}
+                    checked={f.media_aspect === value}
+                    onChange={() => onChange('media_aspect', value)}
+                    className="accent-stone-600"
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="block text-[10px] tracking-widest text-stone-500 mb-2">
+              画像の表示位置
+            </label>
+            <select
+              value={f.media_position}
+              onChange={(e) => onChange('media_position', e.target.value as SectionForm['media_position'])}
+              className="border border-stone-300 rounded px-3 py-1.5 text-xs text-stone-800 focus:outline-none focus:border-stone-500 bg-white"
+            >
+              <option value="center">中央</option>
+              <option value="top">上</option>
+              <option value="bottom">下</option>
+              <option value="left">左</option>
+              <option value="right">右</option>
+            </select>
           </div>
           <div className="flex items-center gap-2">
             <input
@@ -541,6 +589,8 @@ export default function AdminRecruitPage() {
           media_url: s.media_url ?? null,
           media_type: s.media_type ?? null,
           media_layout: ((s.media_layout ?? 'top') as 'top' | 'side'),
+          media_aspect: ((s.media_aspect ?? 'video') as 'video' | 'portrait' | 'square'),
+          media_position: ((s.media_position ?? 'center') as 'center' | 'top' | 'bottom' | 'left' | 'right'),
         }))
       );
     }
@@ -579,6 +629,8 @@ export default function AdminRecruitPage() {
         body: secForm.body,
         items: secForm.items,
         media_layout: secForm.media_layout,
+        media_aspect: secForm.media_aspect,
+        media_position: secForm.media_position,
         sort_order: secForm.sort_order,
         is_active: secForm.is_active,
       })
@@ -611,6 +663,8 @@ export default function AdminRecruitPage() {
         body: newSecForm.body,
         items: newSecForm.items,
         media_layout: newSecForm.media_layout,
+        media_aspect: newSecForm.media_aspect,
+        media_position: newSecForm.media_position,
         sort_order: newSecForm.sort_order,
         is_active: newSecForm.is_active,
       });
