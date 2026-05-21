@@ -22,6 +22,7 @@ const FALLBACK_SECTIONS = [
     items: [] as string[],
     media_url: null as string | null,
     media_type: null as string | null,
+    media_layout: null as string | null,
   },
   {
     title: 'AHNKISMで働く魅力',
@@ -35,6 +36,7 @@ const FALLBACK_SECTIONS = [
     ],
     media_url: null as string | null,
     media_type: null as string | null,
+    media_layout: null as string | null,
   },
   {
     title: '教育システム',
@@ -47,6 +49,7 @@ const FALLBACK_SECTIONS = [
     ],
     media_url: null as string | null,
     media_type: null as string | null,
+    media_layout: null as string | null,
   },
   {
     title: '大切にしていること',
@@ -59,6 +62,7 @@ const FALLBACK_SECTIONS = [
     ],
     media_url: null as string | null,
     media_type: null as string | null,
+    media_layout: null as string | null,
   },
 ];
 
@@ -74,6 +78,7 @@ type SectionItem = {
   items: string[];
   media_url: string | null;
   media_type: string | null;
+  media_layout: string | null;
 };
 
 type JobItem = {
@@ -92,7 +97,7 @@ export default async function RecruitPage() {
     const [secRes, jobRes] = await Promise.all([
       supabase
         .from('recruit_sections')
-        .select('title, body, items, media_url, media_type')
+        .select('title, body, items, media_url, media_type, media_layout')
         .eq('is_active', true)
         .order('sort_order', { ascending: true }),
       supabase
@@ -114,6 +119,7 @@ export default async function RecruitPage() {
           items: Array.isArray(s.items) ? (s.items as string[]) : [],
           media_url: s.media_url ?? null,
           media_type: s.media_type ?? null,
+          media_layout: s.media_layout ?? null,
         }));
 
   const cards =
@@ -144,47 +150,74 @@ export default async function RecruitPage() {
         <section className="py-16 sm:py-20">
           <Container narrow>
             <div className="space-y-14">
-              {displaySections.map((sec, i) => (
-                <div key={i}>
-                  <p className="text-[10px] tracking-[0.3em] text-[#C9A96E] uppercase mb-2">
-                    0{i + 1}
-                  </p>
-                  <h2 className="text-xl font-light tracking-wider text-stone-800 mb-4">
-                    {sec.title}
-                  </h2>
-                  {sec.media_url && (
-                    <div className="aspect-video bg-stone-100 overflow-hidden relative mb-5">
-                      {sec.media_type === 'video' ? (
-                        <LazyAutoPlayVideo
-                          src={sec.media_url}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <Image
-                          src={sec.media_url}
-                          alt={sec.title}
-                          fill
-                          className="object-cover"
-                          unoptimized
-                        />
-                      )}
-                    </div>
-                  )}
-                  {sec.body && (
-                    <p className="text-sm text-stone-500 leading-relaxed mb-5 whitespace-pre-line">{sec.body}</p>
-                  )}
-                  {sec.items.length > 0 && (
-                    <ul className="space-y-2">
-                      {sec.items.map((item, j) => (
-                        <li key={j} className="flex items-start gap-3 text-xs text-stone-600">
-                          <span className="text-[#C9A96E] mt-0.5 shrink-0">—</span>
-                          <span className="leading-relaxed">{item}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              ))}
+              {displaySections.map((sec, i) => {
+                const isSide = (sec.media_layout ?? 'top') === 'side' && !!sec.media_url;
+
+                const mediaEl = sec.media_url ? (
+                  sec.media_type === 'video' ? (
+                    <LazyAutoPlayVideo
+                      src={sec.media_url}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <Image
+                      src={sec.media_url}
+                      alt={sec.title}
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                  )
+                ) : null;
+
+                const textEl = (
+                  <>
+                    {sec.body && (
+                      <p className="text-sm text-stone-500 leading-relaxed mb-5 whitespace-pre-line">
+                        {sec.body}
+                      </p>
+                    )}
+                    {sec.items.length > 0 && (
+                      <ul className="space-y-2">
+                        {sec.items.map((item, j) => (
+                          <li key={j} className="flex items-start gap-3 text-xs text-stone-600">
+                            <span className="text-[#C9A96E] mt-0.5 shrink-0">—</span>
+                            <span className="leading-relaxed">{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </>
+                );
+
+                return (
+                  <div key={i}>
+                    <p className="text-[10px] tracking-[0.3em] text-[#C9A96E] uppercase mb-2">
+                      0{i + 1}
+                    </p>
+                    <h2 className="text-xl font-light tracking-wider text-stone-800 mb-4">
+                      {sec.title}
+                    </h2>
+                    {isSide ? (
+                      <div className="flex flex-col sm:flex-row gap-8 items-start">
+                        <div className="w-full sm:w-2/5 shrink-0 aspect-video bg-stone-100 overflow-hidden relative">
+                          {mediaEl}
+                        </div>
+                        <div className="flex-1">{textEl}</div>
+                      </div>
+                    ) : (
+                      <>
+                        {sec.media_url && (
+                          <div className="aspect-video bg-stone-100 overflow-hidden relative mb-5">
+                            {mediaEl}
+                          </div>
+                        )}
+                        {textEl}
+                      </>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </Container>
         </section>

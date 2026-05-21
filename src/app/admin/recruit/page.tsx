@@ -81,6 +81,7 @@ type RecruitSection = {
   items: string[];
   media_url: string | null;
   media_type: 'image' | 'video' | null;
+  media_layout: 'top' | 'side';
   sort_order: number;
   is_active: boolean;
 };
@@ -92,6 +93,7 @@ type SectionForm = {
   items: string[];
   media_url: string | null;
   media_type: 'image' | 'video' | null;
+  media_layout: 'top' | 'side';
   sort_order: number;
   is_active: boolean;
 };
@@ -103,6 +105,7 @@ const EMPTY_SECTION_FORM: SectionForm = {
   items: [],
   media_url: null,
   media_type: null,
+  media_layout: 'top',
   sort_order: 0,
   is_active: true,
 };
@@ -115,6 +118,7 @@ function toSectionForm(s: RecruitSection): SectionForm {
     items: s.items,
     media_url: s.media_url,
     media_type: s.media_type,
+    media_layout: s.media_layout,
     sort_order: s.sort_order,
     is_active: s.is_active,
   };
@@ -261,6 +265,35 @@ function SectionFormFields({
               placeholder="0"
               type="number"
             />
+          </div>
+          <div>
+            <label className="block text-[10px] tracking-widest text-stone-500 mb-2">
+              画像レイアウト
+            </label>
+            <div className="flex gap-6">
+              <label className="flex items-center gap-2 text-xs text-stone-600 cursor-pointer">
+                <input
+                  type="radio"
+                  name={`media_layout_${idSuffix}`}
+                  value="top"
+                  checked={f.media_layout === 'top'}
+                  onChange={() => onChange('media_layout', 'top')}
+                  className="accent-stone-600"
+                />
+                上に大きく表示（top）
+              </label>
+              <label className="flex items-center gap-2 text-xs text-stone-600 cursor-pointer">
+                <input
+                  type="radio"
+                  name={`media_layout_${idSuffix}`}
+                  value="side"
+                  checked={f.media_layout === 'side'}
+                  onChange={() => onChange('media_layout', 'side')}
+                  className="accent-stone-600"
+                />
+                本文の横に表示（side）
+              </label>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <input
@@ -507,6 +540,7 @@ export default function AdminRecruitPage() {
           items: Array.isArray(s.items) ? s.items : [],
           media_url: s.media_url ?? null,
           media_type: s.media_type ?? null,
+          media_layout: ((s.media_layout ?? 'top') as 'top' | 'side'),
         }))
       );
     }
@@ -544,6 +578,7 @@ export default function AdminRecruitPage() {
         title: secForm.title,
         body: secForm.body,
         items: secForm.items,
+        media_layout: secForm.media_layout,
         sort_order: secForm.sort_order,
         is_active: secForm.is_active,
       })
@@ -575,6 +610,7 @@ export default function AdminRecruitPage() {
         title: newSecForm.title,
         body: newSecForm.body,
         items: newSecForm.items,
+        media_layout: newSecForm.media_layout,
         sort_order: newSecForm.sort_order,
         is_active: newSecForm.is_active,
       });
