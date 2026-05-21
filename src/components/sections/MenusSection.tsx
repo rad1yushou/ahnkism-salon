@@ -5,6 +5,14 @@ import Button from '@/components/ui/Button';
 import { MENUS, type Menu } from '@/constants/menus';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
+export type MenuCardData = Menu & {
+  imageUrl: string | null;
+  mediaUrl: string | null;
+  mediaType: 'image' | 'video' | null;
+  mediaAspect: string | null;
+  mediaPosition: string | null;
+};
+
 function parseFeaturedCount(raw: string | null | undefined): number {
   const n = Number(raw);
   if (!Number.isFinite(n) || n < 1) return 6;
@@ -12,14 +20,21 @@ function parseFeaturedCount(raw: string | null | undefined): number {
 }
 
 export default async function MenusSection() {
-  let featured: Menu[] = MENUS.slice(0, 6); // フォールバック（デフォルト6件）
+  let featured: MenuCardData[] = MENUS.slice(0, 6).map(m => ({
+    ...m,
+    imageUrl: null,
+    mediaUrl: null,
+    mediaType: null,
+    mediaAspect: null,
+    mediaPosition: null,
+  }));
 
   const supabase = await createSupabaseServerClient();
   if (supabase) {
     const [menusRes, settingsRes] = await Promise.all([
       supabase
         .from('menus')
-        .select('slug, name, short_name, description, price, sort_order, is_active')
+        .select('slug, name, short_name, description, price, sort_order, is_active, image_url, media_url, media_type, media_aspect, media_position')
         .order('sort_order', { ascending: true }),
       supabase
         .from('site_settings')
@@ -32,12 +47,11 @@ export default async function MenusSection() {
       const supabaseMap = new Map(menusRes.data.map(r => [r.slug, r]));
       const count = parseFeaturedCount(settingsRes.data?.value);
 
-      const allMenus: Menu[] = [];
+      const allMenus: MenuCardData[] = [];
 
       // Supabase に is_active=true で存在するメニュー（sort_order 順）
       for (const r of menusRes.data.filter(r => r.is_active)) {
         const constMenu = MENUS.find(m => m.slug === r.slug);
-        // Supabase レコードが存在する場合は Supabase の値を正として使う
         allMenus.push({
           slug: r.slug,
           name: r.name,
@@ -47,13 +61,18 @@ export default async function MenusSection() {
           price: r.price ?? '',
           duration: constMenu?.duration ?? '',
           faqs: constMenu?.faqs ?? [],
+          imageUrl: (r as { image_url?: string | null }).image_url ?? null,
+          mediaUrl: (r as { media_url?: string | null }).media_url ?? null,
+          mediaType: ((r as { media_type?: string | null }).media_type ?? null) as 'image' | 'video' | null,
+          mediaAspect: (r as { media_aspect?: string | null }).media_aspect ?? null,
+          mediaPosition: (r as { media_position?: string | null }).media_position ?? null,
         });
       }
 
       // Supabase に存在しない slug は constants をそのまま使う
       for (const m of MENUS) {
         if (!supabaseMap.has(m.slug)) {
-          allMenus.push(m);
+          allMenus.push({ ...m, imageUrl: null, mediaUrl: null, mediaType: null, mediaAspect: null, mediaPosition: null });
         }
       }
 
@@ -73,7 +92,7 @@ export default async function MenusSection() {
         />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
           {featured.map((menu) => (
-            <MenuCard key={menu.slug} menu={menu} />
+            <MenuCard key={menu.slug} menu={menu} imageUrl={menu.imageUrl} mediaUrl={menu.mediaUrl} mediaType={menu.mediaType} mediaAspect={menu.mediaAspect} mediaPosition={menu.mediaPosition} />
           ))}
         </div>
         <div className="text-center">
