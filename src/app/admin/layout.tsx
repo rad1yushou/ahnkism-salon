@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 export const metadata: Metadata = {
   title: {
@@ -7,29 +8,46 @@ export const metadata: Metadata = {
     template: '%s｜AHNKISM 管理画面',
   },
   robots: {
-    index: false,  // 管理画面は検索エンジンにインデックスさせない
+    index: false,
     follow: false,
   },
 };
 
-const ADMIN_NAV = [
-  { href: '/admin/dashboard', label: 'ダッシュボード', icon: '▤' },
-  { href: '/admin/images',    label: '画像管理',       icon: '🖼' },
-  { href: '/admin/salons',    label: '店舗管理',       icon: '🏠' },
-  { href: '/admin/menus',     label: 'メニュー管理',   icon: '✂' },
-  { href: '/admin/staff',     label: 'スタッフ管理',   icon: '👤' },
+type NavItem = { href: string; label: string; icon: string };
+
+const FALLBACK_NAV: NavItem[] = [
+  { href: '/admin/dashboard',     label: 'ダッシュボード', icon: '▤' },
+  { href: '/admin/images',        label: '画像管理',       icon: '🖼' },
+  { href: '/admin/salons',        label: '店舗管理',       icon: '🏠' },
+  { href: '/admin/menus',         label: 'メニュー管理',   icon: '✂' },
+  { href: '/admin/staff',         label: 'スタッフ管理',   icon: '👤' },
   { href: '/admin/reasons',       label: '選ばれる理由',   icon: '★' },
   { href: '/admin/results',       label: '施術実績',       icon: '◈' },
   { href: '/admin/home-sections', label: 'ページ構成',     icon: '☰' },
   { href: '/admin/reviews',       label: '口コミ管理',     icon: '✦' },
   { href: '/admin/recruit',       label: '採用管理',       icon: '✉' },
+  { href: '/admin/nav',           label: '管理メニュー',   icon: '⚙' },
 ];
 
-export default function AdminLayout({
+export default async function AdminLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  let navItems = FALLBACK_NAV;
+
+  const supabase = await createSupabaseServerClient();
+  if (supabase) {
+    const { data, error } = await supabase
+      .from('admin_nav_items')
+      .select('href, label, icon')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true });
+    if (!error && data && data.length > 0) {
+      navItems = data;
+    }
+  }
+
   return (
     <div className="flex min-h-screen bg-stone-50 font-sans">
       {/* サイドバー */}
@@ -43,7 +61,7 @@ export default function AdminLayout({
         {/* ナビ */}
         <nav className="flex-1 py-4">
           <ul className="space-y-0.5">
-            {ADMIN_NAV.map((item) => (
+            {navItems.map((item) => (
               <li key={item.href}>
                 <Link
                   href={item.href}
