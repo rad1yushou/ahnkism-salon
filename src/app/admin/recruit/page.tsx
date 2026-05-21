@@ -3,51 +3,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
-type Requirement = { label: string; value: string };
-
-type Job = {
-  id: string;
-  slug: string;
-  title: string;
-  role_label: string;
-  description: string;
-  requirements: Requirement[];
-  sort_order: number;
-  is_active: boolean;
-};
-
-type EditForm = {
-  slug: string;
-  title: string;
-  role_label: string;
-  description: string;
-  requirements: Requirement[];
-  sort_order: number;
-  is_active: boolean;
-};
-
-const EMPTY_FORM: EditForm = {
-  slug: '',
-  title: '',
-  role_label: '',
-  description: '',
-  requirements: [],
-  sort_order: 0,
-  is_active: true,
-};
-
-function toEditForm(j: Job): EditForm {
-  return {
-    slug: j.slug,
-    title: j.title,
-    role_label: j.role_label,
-    description: j.description,
-    requirements: j.requirements,
-    sort_order: j.sort_order,
-    is_active: j.is_active,
-  };
-}
-
+// ============================================================
+// 共通型・定数
+// ============================================================
 const inputBase =
   'w-full border border-stone-300 rounded px-3 py-1.5 text-xs text-stone-800 focus:outline-none focus:border-stone-500 bg-white';
 
@@ -95,6 +53,228 @@ function Field({
   );
 }
 
+// ============================================================
+// 採用本文セクション（recruit_sections）
+// ============================================================
+type RecruitSection = {
+  id: string;
+  section_key: string;
+  title: string;
+  body: string;
+  items: string[];
+  sort_order: number;
+  is_active: boolean;
+};
+
+type SectionForm = {
+  section_key: string;
+  title: string;
+  body: string;
+  items: string[];
+  sort_order: number;
+  is_active: boolean;
+};
+
+const EMPTY_SECTION_FORM: SectionForm = {
+  section_key: '',
+  title: '',
+  body: '',
+  items: [],
+  sort_order: 0,
+  is_active: true,
+};
+
+function toSectionForm(s: RecruitSection): SectionForm {
+  return {
+    section_key: s.section_key,
+    title: s.title,
+    body: s.body,
+    items: s.items,
+    sort_order: s.sort_order,
+    is_active: s.is_active,
+  };
+}
+
+function ItemsEditor({
+  items,
+  onChange,
+}: {
+  items: string[];
+  onChange: (items: string[]) => void;
+}) {
+  const add = () => onChange([...items, '']);
+  const remove = (i: number) => onChange(items.filter((_, idx) => idx !== i));
+  const update = (i: number, val: string) =>
+    onChange(items.map((v, idx) => (idx === i ? val : v)));
+
+  return (
+    <div>
+      <label className="block text-[10px] tracking-widest text-stone-500 mb-2">
+        箇条書きリスト
+      </label>
+      <div className="space-y-2 mb-2">
+        {items.length === 0 && (
+          <p className="text-[10px] text-stone-400">
+            項目がありません。「+ 項目を追加」で追加してください。
+          </p>
+        )}
+        {items.map((item, i) => (
+          <div key={i} className="flex gap-2 items-center">
+            <input
+              value={item}
+              onChange={(e) => update(i, e.target.value)}
+              placeholder="例: 完全週休2日制"
+              className="flex-1 border border-stone-300 rounded px-2 py-1.5 text-xs text-stone-800 focus:outline-none focus:border-stone-500 bg-white"
+            />
+            <button
+              type="button"
+              onClick={() => remove(i)}
+              className="shrink-0 text-[10px] px-2 py-1.5 border border-red-300 text-red-400 hover:bg-red-50 rounded transition-colors"
+            >
+              削除
+            </button>
+          </div>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={add}
+        className="text-[10px] px-3 py-1.5 border border-stone-300 text-stone-600 hover:bg-stone-50 rounded transition-colors"
+      >
+        + 項目を追加
+      </button>
+    </div>
+  );
+}
+
+type SectionFormOnChange = <K extends keyof SectionForm>(key: K, value: SectionForm[K]) => void;
+
+function SectionFormFields({
+  f,
+  onChange,
+  idSuffix,
+}: {
+  f: SectionForm;
+  onChange: SectionFormOnChange;
+  idSuffix: string;
+}) {
+  return (
+    <div className="space-y-5">
+      <div>
+        <p className="text-[10px] tracking-widest text-stone-400 uppercase mb-3">セクション内容</p>
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <Field
+              label="タイトル"
+              value={f.title}
+              onChange={(v) => onChange('title', v)}
+              placeholder="AHNKISMで働く魅力"
+              required
+            />
+            <Field
+              label="識別キー (section_key)"
+              value={f.section_key}
+              onChange={(v) => onChange('section_key', v)}
+              placeholder="benefits"
+              required
+            />
+          </div>
+          <Field
+            label="本文"
+            value={f.body}
+            onChange={(v) => onChange('body', v)}
+            placeholder="セクションの説明文を入力"
+            rows={3}
+          />
+        </div>
+      </div>
+
+      <div>
+        <p className="text-[10px] tracking-widest text-stone-400 uppercase mb-3">箇条書き</p>
+        <ItemsEditor
+          items={f.items}
+          onChange={(items) => onChange('items', items)}
+        />
+      </div>
+
+      <div>
+        <p className="text-[10px] tracking-widest text-stone-400 uppercase mb-3">表示設定</p>
+        <div className="space-y-3">
+          <div className="w-40">
+            <Field
+              label="表示順 (sort_order)"
+              value={f.sort_order}
+              onChange={(v) => onChange('sort_order', Number(v))}
+              placeholder="0"
+              type="number"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              id={`sec_is_active_${idSuffix}`}
+              type="checkbox"
+              checked={f.is_active}
+              onChange={(e) => onChange('is_active', e.target.checked)}
+              className="rounded border-stone-300"
+            />
+            <label htmlFor={`sec_is_active_${idSuffix}`} className="text-xs text-stone-600">
+              公開する（チェックを外すと非表示）
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// 募集職種（recruit_jobs）
+// ============================================================
+type Requirement = { label: string; value: string };
+
+type Job = {
+  id: string;
+  slug: string;
+  title: string;
+  role_label: string;
+  description: string;
+  requirements: Requirement[];
+  sort_order: number;
+  is_active: boolean;
+};
+
+type JobForm = {
+  slug: string;
+  title: string;
+  role_label: string;
+  description: string;
+  requirements: Requirement[];
+  sort_order: number;
+  is_active: boolean;
+};
+
+const EMPTY_JOB_FORM: JobForm = {
+  slug: '',
+  title: '',
+  role_label: '',
+  description: '',
+  requirements: [],
+  sort_order: 0,
+  is_active: true,
+};
+
+function toJobForm(j: Job): JobForm {
+  return {
+    slug: j.slug,
+    title: j.title,
+    role_label: j.role_label,
+    description: j.description,
+    requirements: j.requirements,
+    sort_order: j.sort_order,
+    is_active: j.is_active,
+  };
+}
+
 function RequirementsEditor({
   requirements,
   onChange,
@@ -104,18 +284,17 @@ function RequirementsEditor({
 }) {
   const add = () => onChange([...requirements, { label: '', value: '' }]);
   const remove = (i: number) => onChange(requirements.filter((_, idx) => idx !== i));
-  const update = (i: number, key: 'label' | 'value', val: string) => {
+  const update = (i: number, key: 'label' | 'value', val: string) =>
     onChange(requirements.map((r, idx) => (idx === i ? { ...r, [key]: val } : r)));
-  };
 
   return (
     <div>
-      <label className="block text-[10px] tracking-widest text-stone-500 mb-2">
-        募集要項
-      </label>
+      <label className="block text-[10px] tracking-widest text-stone-500 mb-2">募集要項</label>
       <div className="space-y-2 mb-2">
         {requirements.length === 0 && (
-          <p className="text-[10px] text-stone-400">項目がありません。「+ 項目を追加」で追加してください。</p>
+          <p className="text-[10px] text-stone-400">
+            項目がありません。「+ 項目を追加」で追加してください。
+          </p>
         )}
         {requirements.map((req, i) => (
           <div key={i} className="flex gap-2 items-start">
@@ -152,9 +331,9 @@ function RequirementsEditor({
   );
 }
 
-type FormFieldsOnChange = <K extends keyof EditForm>(key: K, value: EditForm[K]) => void;
+type JobFormOnChange = <K extends keyof JobForm>(key: K, value: JobForm[K]) => void;
 
-function FormFields({ f, onChange }: { f: EditForm; onChange: FormFieldsOnChange }) {
+function JobFormFields({ f, onChange, idSuffix }: { f: JobForm; onChange: JobFormOnChange; idSuffix: string }) {
   return (
     <div className="space-y-5">
       <div>
@@ -214,13 +393,13 @@ function FormFields({ f, onChange }: { f: EditForm; onChange: FormFieldsOnChange
           </div>
           <div className="flex items-center gap-2">
             <input
-              id="is_active_field"
+              id={`job_is_active_${idSuffix}`}
               type="checkbox"
               checked={f.is_active}
               onChange={(e) => onChange('is_active', e.target.checked)}
               className="rounded border-stone-300"
             />
-            <label htmlFor="is_active_field" className="text-xs text-stone-600">
+            <label htmlFor={`job_is_active_${idSuffix}`} className="text-xs text-stone-600">
               掲載する（チェックを外すと非表示）
             </label>
           </div>
@@ -230,28 +409,156 @@ function FormFields({ f, onChange }: { f: EditForm; onChange: FormFieldsOnChange
   );
 }
 
+// ============================================================
+// メインページコンポーネント
+// ============================================================
 export default function AdminRecruitPage() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const isConfigured = !!supabase;
 
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'sections' | 'jobs'>('sections');
   const [message, setMessage] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<EditForm | null>(null);
-  const [isAddingNew, setIsAddingNew] = useState(false);
-  const [newForm, setNewForm] = useState<EditForm>({ ...EMPTY_FORM });
-  const [savingNew, setSavingNew] = useState(false);
 
   const showMessage = (msg: string) => {
     setMessage(msg);
     setTimeout(() => setMessage(''), 4000);
   };
 
-  const loadData = useCallback(async () => {
-    if (!supabase) { setLoading(false); return; }
-    setLoading(true);
+  // ----------------------------------------------------------
+  // 採用本文セクション state
+  // ----------------------------------------------------------
+  const [sections, setSections] = useState<RecruitSection[]>([]);
+  const [loadingSec, setLoadingSec] = useState(true);
+  const [savingSec, setSavingSec] = useState(false);
+  const [editingSecId, setEditingSecId] = useState<string | null>(null);
+  const [secForm, setSecForm] = useState<SectionForm | null>(null);
+  const [isAddingNewSec, setIsAddingNewSec] = useState(false);
+  const [newSecForm, setNewSecForm] = useState<SectionForm>({ ...EMPTY_SECTION_FORM });
+  const [savingNewSec, setSavingNewSec] = useState(false);
+
+  const loadSections = useCallback(async () => {
+    if (!supabase) { setLoadingSec(false); return; }
+    setLoadingSec(true);
+    const { data, error } = await supabase
+      .from('recruit_sections')
+      .select('*')
+      .order('sort_order', { ascending: true });
+    if (error) {
+      showMessage(`取得失敗: ${error.message}`);
+    } else {
+      setSections(
+        (data ?? []).map((s) => ({
+          ...s,
+          items: Array.isArray(s.items) ? s.items : [],
+        }))
+      );
+    }
+    setLoadingSec(false);
+  }, [supabase]);
+
+  useEffect(() => { loadSections(); }, [loadSections]);
+
+  const startEditSec = (s: RecruitSection) => {
+    setIsAddingNewSec(false);
+    setEditingSecId(s.id);
+    setSecForm(toSectionForm(s));
+  };
+  const cancelEditSec = () => { setEditingSecId(null); setSecForm(null); };
+  const setSecField = <K extends keyof SectionForm>(key: K, value: SectionForm[K]) => {
+    setSecForm((prev) => (prev ? { ...prev, [key]: value } : prev));
+  };
+
+  const validateSection = (f: SectionForm): string | null => {
+    if (!f.title.trim()) return 'タイトルは必須です';
+    if (!f.section_key.trim()) return '識別キーは必須です';
+    if (!/^[a-z0-9_-]+$/.test(f.section_key)) return '識別キーは英小文字・数字・ハイフン・アンダースコアのみ使用できます';
+    return null;
+  };
+
+  const saveEditSec = async (secId: string) => {
+    if (!supabase || !secForm) return;
+    const err = validateSection(secForm);
+    if (err) { showMessage(err); return; }
+    setSavingSec(true);
+    const { error } = await supabase
+      .from('recruit_sections')
+      .update({
+        section_key: secForm.section_key,
+        title: secForm.title,
+        body: secForm.body,
+        items: secForm.items,
+        sort_order: secForm.sort_order,
+        is_active: secForm.is_active,
+      })
+      .eq('id', secId);
+    setSavingSec(false);
+    if (error) { showMessage(`保存失敗: ${error.message}`); return; }
+    showMessage('保存しました');
+    cancelEditSec();
+    await loadSections();
+  };
+
+  const openAddNewSec = () => {
+    cancelEditSec();
+    const maxSort = sections.length > 0 ? Math.max(...sections.map((s) => s.sort_order)) + 1 : 1;
+    setNewSecForm({ ...EMPTY_SECTION_FORM, sort_order: maxSort });
+    setIsAddingNewSec(true);
+  };
+  const cancelAddNewSec = () => { setIsAddingNewSec(false); setNewSecForm({ ...EMPTY_SECTION_FORM }); };
+
+  const addSection = async () => {
+    if (!supabase) return;
+    const err = validateSection(newSecForm);
+    if (err) { showMessage(err); return; }
+    setSavingNewSec(true);
+    const { error } = await supabase
+      .from('recruit_sections')
+      .insert({
+        section_key: newSecForm.section_key,
+        title: newSecForm.title,
+        body: newSecForm.body,
+        items: newSecForm.items,
+        sort_order: newSecForm.sort_order,
+        is_active: newSecForm.is_active,
+      });
+    setSavingNewSec(false);
+    if (error) { showMessage(`追加失敗: ${error.message}`); return; }
+    showMessage(`「${newSecForm.title}」を追加しました`);
+    cancelAddNewSec();
+    await loadSections();
+  };
+
+  const toggleActiveSec = async (s: RecruitSection) => {
+    if (!supabase) return;
+    await supabase.from('recruit_sections').update({ is_active: !s.is_active }).eq('id', s.id);
+    await loadSections();
+  };
+
+  const deleteSec = async (s: RecruitSection) => {
+    if (!supabase) return;
+    if (!window.confirm(`「${s.title}」を削除しますか？この操作は取り消せません。`)) return;
+    const { error } = await supabase.from('recruit_sections').delete().eq('id', s.id);
+    if (error) { showMessage(`削除失敗: ${error.message}`); return; }
+    showMessage(`「${s.title}」を削除しました`);
+    if (editingSecId === s.id) cancelEditSec();
+    await loadSections();
+  };
+
+  // ----------------------------------------------------------
+  // 募集職種 state
+  // ----------------------------------------------------------
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [loadingJobs, setLoadingJobs] = useState(true);
+  const [savingJob, setSavingJob] = useState(false);
+  const [editingJobId, setEditingJobId] = useState<string | null>(null);
+  const [jobForm, setJobForm] = useState<JobForm | null>(null);
+  const [isAddingNewJob, setIsAddingNewJob] = useState(false);
+  const [newJobForm, setNewJobForm] = useState<JobForm>({ ...EMPTY_JOB_FORM });
+  const [savingNewJob, setSavingNewJob] = useState(false);
+
+  const loadJobs = useCallback(async () => {
+    if (!supabase) { setLoadingJobs(false); return; }
+    setLoadingJobs(true);
     const { data, error } = await supabase
       .from('recruit_jobs')
       .select('*')
@@ -259,101 +566,94 @@ export default function AdminRecruitPage() {
     if (error) {
       showMessage(`取得失敗: ${error.message}`);
     } else {
-      setJobs((data ?? []).map((j) => ({
-        ...j,
-        requirements: Array.isArray(j.requirements) ? j.requirements : [],
-      })));
+      setJobs(
+        (data ?? []).map((j) => ({
+          ...j,
+          requirements: Array.isArray(j.requirements) ? j.requirements : [],
+        }))
+      );
     }
-    setLoading(false);
+    setLoadingJobs(false);
   }, [supabase]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => { loadJobs(); }, [loadJobs]);
 
-  const startEdit = (j: Job) => {
-    setIsAddingNew(false);
-    setEditingId(j.id);
-    setForm(toEditForm(j));
+  const startEditJob = (j: Job) => {
+    setIsAddingNewJob(false);
+    setEditingJobId(j.id);
+    setJobForm(toJobForm(j));
+  };
+  const cancelEditJob = () => { setEditingJobId(null); setJobForm(null); };
+  const setJobField = <K extends keyof JobForm>(key: K, value: JobForm[K]) => {
+    setJobForm((prev) => (prev ? { ...prev, [key]: value } : prev));
   };
 
-  const cancelEdit = () => {
-    setEditingId(null);
-    setForm(null);
-  };
-
-  const setField = <K extends keyof EditForm>(key: K, value: EditForm[K]) => {
-    setForm((prev) => (prev ? { ...prev, [key]: value } : prev));
-  };
-
-  const validate = (f: EditForm): string | null => {
+  const validateJob = (f: JobForm): string | null => {
     if (!f.title.trim()) return 'タイトルは必須です';
     if (!f.slug.trim()) return 'スラッグは必須です';
     if (!/^[a-z0-9-]+$/.test(f.slug)) return 'スラッグは英小文字・数字・ハイフンのみ使用できます';
     return null;
   };
 
-  const saveEdit = async (jobId: string) => {
-    if (!supabase || !form) return;
-    const err = validate(form);
+  const saveEditJob = async (jobId: string) => {
+    if (!supabase || !jobForm) return;
+    const err = validateJob(jobForm);
     if (err) { showMessage(err); return; }
-    setSaving(true);
+    setSavingJob(true);
     const { error } = await supabase
       .from('recruit_jobs')
       .update({
-        slug: form.slug,
-        title: form.title,
-        role_label: form.role_label,
-        description: form.description,
-        requirements: form.requirements,
-        sort_order: form.sort_order,
-        is_active: form.is_active,
+        slug: jobForm.slug,
+        title: jobForm.title,
+        role_label: jobForm.role_label,
+        description: jobForm.description,
+        requirements: jobForm.requirements,
+        sort_order: jobForm.sort_order,
+        is_active: jobForm.is_active,
       })
       .eq('id', jobId);
-    setSaving(false);
+    setSavingJob(false);
     if (error) { showMessage(`保存失敗: ${error.message}`); return; }
     showMessage('保存しました');
-    cancelEdit();
-    await loadData();
+    cancelEditJob();
+    await loadJobs();
   };
 
-  const openAddNew = () => {
-    cancelEdit();
+  const openAddNewJob = () => {
+    cancelEditJob();
     const maxSort = jobs.length > 0 ? Math.max(...jobs.map((j) => j.sort_order)) + 1 : 1;
-    setNewForm({ ...EMPTY_FORM, sort_order: maxSort });
-    setIsAddingNew(true);
+    setNewJobForm({ ...EMPTY_JOB_FORM, sort_order: maxSort });
+    setIsAddingNewJob(true);
   };
-
-  const cancelAddNew = () => {
-    setIsAddingNew(false);
-    setNewForm({ ...EMPTY_FORM });
-  };
+  const cancelAddNewJob = () => { setIsAddingNewJob(false); setNewJobForm({ ...EMPTY_JOB_FORM }); };
 
   const addJob = async () => {
     if (!supabase) return;
-    const err = validate(newForm);
+    const err = validateJob(newJobForm);
     if (err) { showMessage(err); return; }
-    setSavingNew(true);
+    setSavingNewJob(true);
     const { error } = await supabase
       .from('recruit_jobs')
       .insert({
-        slug: newForm.slug,
-        title: newForm.title,
-        role_label: newForm.role_label,
-        description: newForm.description,
-        requirements: newForm.requirements,
-        sort_order: newForm.sort_order,
-        is_active: newForm.is_active,
+        slug: newJobForm.slug,
+        title: newJobForm.title,
+        role_label: newJobForm.role_label,
+        description: newJobForm.description,
+        requirements: newJobForm.requirements,
+        sort_order: newJobForm.sort_order,
+        is_active: newJobForm.is_active,
       });
-    setSavingNew(false);
+    setSavingNewJob(false);
     if (error) { showMessage(`追加失敗: ${error.message}`); return; }
-    showMessage(`「${newForm.title}」を追加しました`);
-    cancelAddNew();
-    await loadData();
+    showMessage(`「${newJobForm.title}」を追加しました`);
+    cancelAddNewJob();
+    await loadJobs();
   };
 
-  const toggleActive = async (j: Job) => {
+  const toggleActiveJob = async (j: Job) => {
     if (!supabase) return;
     await supabase.from('recruit_jobs').update({ is_active: !j.is_active }).eq('id', j.id);
-    await loadData();
+    await loadJobs();
   };
 
   const deleteJob = async (j: Job) => {
@@ -362,16 +662,19 @@ export default function AdminRecruitPage() {
     const { error } = await supabase.from('recruit_jobs').delete().eq('id', j.id);
     if (error) { showMessage(`削除失敗: ${error.message}`); return; }
     showMessage(`「${j.title}」を削除しました`);
-    if (editingId === j.id) cancelEdit();
-    await loadData();
+    if (editingJobId === j.id) cancelEditJob();
+    await loadJobs();
   };
 
+  // ----------------------------------------------------------
+  // レンダー
+  // ----------------------------------------------------------
   return (
     <div className="space-y-6 max-w-3xl">
       <div>
         <h1 className="text-lg font-medium text-stone-800 tracking-wide">採用情報 管理</h1>
         <p className="text-xs text-stone-500 mt-1">
-          採用ページに掲載する職種を管理します。スラッグが URL になります（例: stylist → /recruit/stylist）。
+          採用ページの本文セクションと募集職種を管理します。
         </p>
       </div>
 
@@ -387,134 +690,299 @@ export default function AdminRecruitPage() {
         </div>
       )}
 
-      {/* 新規追加フォーム */}
-      {!isAddingNew ? (
+      {/* タブ */}
+      <div className="border-b border-stone-200">
         <button
-          onClick={openAddNew}
-          disabled={!isConfigured}
-          className="px-4 py-2 rounded border border-stone-400 text-stone-600 text-xs hover:bg-stone-100 transition-colors disabled:opacity-40"
+          onClick={() => setActiveTab('sections')}
+          className={`pb-3 px-1 mr-6 text-xs tracking-wider border-b-2 transition-colors ${
+            activeTab === 'sections'
+              ? 'border-stone-800 text-stone-800'
+              : 'border-transparent text-stone-400 hover:text-stone-600'
+          }`}
         >
-          + 新規職種を追加
+          採用本文セクション
         </button>
-      ) : (
-        <section className="bg-white border border-[#C9A96E] rounded-lg">
-          <div className="px-5 py-4 border-b border-stone-100">
-            <p className="text-sm font-medium text-stone-800">新規職種を追加</p>
-          </div>
-          <div className="border-t border-stone-100 px-5 py-5 space-y-5">
-            <FormFields
-              f={newForm}
-              onChange={(key, value) => setNewForm((prev) => ({ ...prev, [key]: value }))}
-            />
-            <div className="flex items-center gap-3 pt-2 border-t border-stone-100">
-              <button
-                onClick={addJob}
-                disabled={!isConfigured || savingNew}
-                className="px-4 py-1.5 rounded bg-green-500 text-white text-xs hover:bg-green-600 transition-colors disabled:opacity-40"
-              >
-                {savingNew ? '追加中...' : '追加する'}
-              </button>
-              <button
-                onClick={cancelAddNew}
-                className="px-4 py-1.5 rounded border border-stone-300 text-stone-500 text-xs hover:bg-stone-50 transition-colors"
-              >
-                キャンセル
-              </button>
-            </div>
-          </div>
-        </section>
-      )}
+        <button
+          onClick={() => setActiveTab('jobs')}
+          className={`pb-3 px-1 text-xs tracking-wider border-b-2 transition-colors ${
+            activeTab === 'jobs'
+              ? 'border-stone-800 text-stone-800'
+              : 'border-transparent text-stone-400 hover:text-stone-600'
+          }`}
+        >
+          募集職種
+        </button>
+      </div>
 
-      {/* 一覧 */}
-      {loading ? (
-        <p className="text-xs text-stone-400">読み込み中...</p>
-      ) : jobs.length === 0 ? (
-        <p className="text-xs text-stone-400">職種がありません</p>
-      ) : (
+      {/* ========== 採用本文セクション タブ ========== */}
+      {activeTab === 'sections' && (
         <div className="space-y-4">
-          {jobs.map((j) => (
-            <section key={j.id} className="bg-white border border-stone-200 rounded-lg">
+          <p className="text-xs text-stone-400">
+            採用ページ上部に表示するセクション（採用メッセージ・働く魅力・教育システムなど）を管理します。
+          </p>
 
-              {/* カードヘッダー */}
-              <div className="flex items-center justify-between px-5 py-4">
-                <div className="flex items-center gap-3">
-                  <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium text-white ${
-                    j.is_active ? 'bg-green-500' : 'bg-stone-400'
-                  }`}>
-                    {j.is_active ? '掲載中' : '非掲載'}
-                  </span>
-                  <div>
-                    <p className="text-sm font-medium text-stone-800 tracking-wide">{j.title}</p>
-                    <p className="text-[10px] text-stone-400 tracking-wider mt-0.5">
-                      /recruit/{j.slug}
-                      {j.role_label && `　${j.role_label}`}
-                      {`　sort: ${j.sort_order}`}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
+          {/* 新規追加フォーム */}
+          {!isAddingNewSec ? (
+            <button
+              onClick={openAddNewSec}
+              disabled={!isConfigured}
+              className="px-4 py-2 rounded border border-stone-400 text-stone-600 text-xs hover:bg-stone-100 transition-colors disabled:opacity-40"
+            >
+              + 新規セクションを追加
+            </button>
+          ) : (
+            <section className="bg-white border border-[#C9A96E] rounded-lg">
+              <div className="px-5 py-4 border-b border-stone-100">
+                <p className="text-sm font-medium text-stone-800">新規セクションを追加</p>
+              </div>
+              <div className="border-t border-stone-100 px-5 py-5 space-y-5">
+                <SectionFormFields
+                  f={newSecForm}
+                  onChange={(key, value) => setNewSecForm((prev) => ({ ...prev, [key]: value }))}
+                  idSuffix="new"
+                />
+                <div className="flex items-center gap-3 pt-2 border-t border-stone-100">
                   <button
-                    onClick={() => toggleActive(j)}
-                    disabled={!isConfigured}
-                    className={`text-[10px] px-2 py-1 rounded border transition-colors disabled:opacity-40 ${
-                      j.is_active
-                        ? 'border-green-400 text-green-600 hover:bg-green-50'
-                        : 'border-stone-300 text-stone-400 hover:bg-stone-50'
-                    }`}
+                    onClick={addSection}
+                    disabled={!isConfigured || savingNewSec}
+                    className="px-4 py-1.5 rounded bg-green-500 text-white text-xs hover:bg-green-600 transition-colors disabled:opacity-40"
                   >
-                    {j.is_active ? '掲載中' : '非掲載'}
+                    {savingNewSec ? '追加中...' : '追加する'}
                   </button>
-                  {editingId === j.id ? (
-                    <button
-                      onClick={cancelEdit}
-                      className="text-[10px] px-3 py-1 rounded border border-stone-300 text-stone-500 hover:bg-stone-50 transition-colors"
-                    >
-                      閉じる
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => startEdit(j)}
-                      disabled={!isConfigured}
-                      className="text-[10px] px-3 py-1 rounded border border-stone-400 text-stone-600 hover:bg-stone-50 transition-colors disabled:opacity-40"
-                    >
-                      編集
-                    </button>
-                  )}
                   <button
-                    onClick={() => deleteJob(j)}
-                    disabled={!isConfigured}
-                    className="text-[10px] px-3 py-1 rounded border border-red-300 text-red-500 hover:bg-red-50 transition-colors disabled:opacity-40"
+                    onClick={cancelAddNewSec}
+                    className="px-4 py-1.5 rounded border border-stone-300 text-stone-500 text-xs hover:bg-stone-50 transition-colors"
                   >
-                    削除
+                    キャンセル
                   </button>
                 </div>
               </div>
-
-              {/* 編集フォーム */}
-              {editingId === j.id && form && (
-                <div className="border-t border-stone-100 px-5 py-5 space-y-5">
-                  <FormFields f={form} onChange={setField} />
-
-                  {/* 保存・キャンセル */}
-                  <div className="flex items-center gap-3 pt-2 border-t border-stone-100">
-                    <button
-                      onClick={() => saveEdit(j.id)}
-                      disabled={!isConfigured || saving}
-                      className="px-4 py-1.5 rounded bg-green-500 text-white text-xs hover:bg-green-600 transition-colors disabled:opacity-40"
-                    >
-                      {saving ? '保存中...' : '保存'}
-                    </button>
-                    <button
-                      onClick={cancelEdit}
-                      className="px-4 py-1.5 rounded border border-stone-300 text-stone-500 text-xs hover:bg-stone-50 transition-colors"
-                    >
-                      キャンセル
-                    </button>
-                  </div>
-                </div>
-              )}
             </section>
-          ))}
+          )}
+
+          {/* 一覧 */}
+          {loadingSec ? (
+            <p className="text-xs text-stone-400">読み込み中...</p>
+          ) : sections.length === 0 ? (
+            <p className="text-xs text-stone-400">セクションがありません</p>
+          ) : (
+            <div className="space-y-4">
+              {sections.map((s) => (
+                <section key={s.id} className="bg-white border border-stone-200 rounded-lg">
+                  <div className="flex items-center justify-between px-5 py-4">
+                    <div className="flex items-center gap-3">
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium text-white ${
+                        s.is_active ? 'bg-green-500' : 'bg-stone-400'
+                      }`}>
+                        {s.is_active ? '公開中' : '非表示'}
+                      </span>
+                      <div>
+                        <p className="text-sm font-medium text-stone-800 tracking-wide">{s.title}</p>
+                        <p className="text-[10px] text-stone-400 tracking-wider mt-0.5">
+                          key: {s.section_key}
+                          {`　sort: ${s.sort_order}`}
+                          {s.items.length > 0 && `　箇条書き: ${s.items.length}件`}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => toggleActiveSec(s)}
+                        disabled={!isConfigured}
+                        className={`text-[10px] px-2 py-1 rounded border transition-colors disabled:opacity-40 ${
+                          s.is_active
+                            ? 'border-green-400 text-green-600 hover:bg-green-50'
+                            : 'border-stone-300 text-stone-400 hover:bg-stone-50'
+                        }`}
+                      >
+                        {s.is_active ? '公開中' : '非表示'}
+                      </button>
+                      {editingSecId === s.id ? (
+                        <button
+                          onClick={cancelEditSec}
+                          className="text-[10px] px-3 py-1 rounded border border-stone-300 text-stone-500 hover:bg-stone-50 transition-colors"
+                        >
+                          閉じる
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => startEditSec(s)}
+                          disabled={!isConfigured}
+                          className="text-[10px] px-3 py-1 rounded border border-stone-400 text-stone-600 hover:bg-stone-50 transition-colors disabled:opacity-40"
+                        >
+                          編集
+                        </button>
+                      )}
+                      <button
+                        onClick={() => deleteSec(s)}
+                        disabled={!isConfigured}
+                        className="text-[10px] px-3 py-1 rounded border border-red-300 text-red-500 hover:bg-red-50 transition-colors disabled:opacity-40"
+                      >
+                        削除
+                      </button>
+                    </div>
+                  </div>
+
+                  {editingSecId === s.id && secForm && (
+                    <div className="border-t border-stone-100 px-5 py-5 space-y-5">
+                      <SectionFormFields f={secForm} onChange={setSecField} idSuffix={s.id} />
+                      <div className="flex items-center gap-3 pt-2 border-t border-stone-100">
+                        <button
+                          onClick={() => saveEditSec(s.id)}
+                          disabled={!isConfigured || savingSec}
+                          className="px-4 py-1.5 rounded bg-green-500 text-white text-xs hover:bg-green-600 transition-colors disabled:opacity-40"
+                        >
+                          {savingSec ? '保存中...' : '保存'}
+                        </button>
+                        <button
+                          onClick={cancelEditSec}
+                          className="px-4 py-1.5 rounded border border-stone-300 text-stone-500 text-xs hover:bg-stone-50 transition-colors"
+                        >
+                          キャンセル
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </section>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========== 募集職種 タブ ========== */}
+      {activeTab === 'jobs' && (
+        <div className="space-y-4">
+          <p className="text-xs text-stone-400">
+            採用ページ下部に表示する募集職種を管理します。スラッグが URL になります（例: stylist → /recruit/stylist）。
+          </p>
+
+          {/* 新規追加フォーム */}
+          {!isAddingNewJob ? (
+            <button
+              onClick={openAddNewJob}
+              disabled={!isConfigured}
+              className="px-4 py-2 rounded border border-stone-400 text-stone-600 text-xs hover:bg-stone-100 transition-colors disabled:opacity-40"
+            >
+              + 新規職種を追加
+            </button>
+          ) : (
+            <section className="bg-white border border-[#C9A96E] rounded-lg">
+              <div className="px-5 py-4 border-b border-stone-100">
+                <p className="text-sm font-medium text-stone-800">新規職種を追加</p>
+              </div>
+              <div className="border-t border-stone-100 px-5 py-5 space-y-5">
+                <JobFormFields
+                  f={newJobForm}
+                  onChange={(key, value) => setNewJobForm((prev) => ({ ...prev, [key]: value }))}
+                  idSuffix="new"
+                />
+                <div className="flex items-center gap-3 pt-2 border-t border-stone-100">
+                  <button
+                    onClick={addJob}
+                    disabled={!isConfigured || savingNewJob}
+                    className="px-4 py-1.5 rounded bg-green-500 text-white text-xs hover:bg-green-600 transition-colors disabled:opacity-40"
+                  >
+                    {savingNewJob ? '追加中...' : '追加する'}
+                  </button>
+                  <button
+                    onClick={cancelAddNewJob}
+                    className="px-4 py-1.5 rounded border border-stone-300 text-stone-500 text-xs hover:bg-stone-50 transition-colors"
+                  >
+                    キャンセル
+                  </button>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* 一覧 */}
+          {loadingJobs ? (
+            <p className="text-xs text-stone-400">読み込み中...</p>
+          ) : jobs.length === 0 ? (
+            <p className="text-xs text-stone-400">職種がありません</p>
+          ) : (
+            <div className="space-y-4">
+              {jobs.map((j) => (
+                <section key={j.id} className="bg-white border border-stone-200 rounded-lg">
+                  <div className="flex items-center justify-between px-5 py-4">
+                    <div className="flex items-center gap-3">
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium text-white ${
+                        j.is_active ? 'bg-green-500' : 'bg-stone-400'
+                      }`}>
+                        {j.is_active ? '掲載中' : '非掲載'}
+                      </span>
+                      <div>
+                        <p className="text-sm font-medium text-stone-800 tracking-wide">{j.title}</p>
+                        <p className="text-[10px] text-stone-400 tracking-wider mt-0.5">
+                          /recruit/{j.slug}
+                          {j.role_label && `　${j.role_label}`}
+                          {`　sort: ${j.sort_order}`}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => toggleActiveJob(j)}
+                        disabled={!isConfigured}
+                        className={`text-[10px] px-2 py-1 rounded border transition-colors disabled:opacity-40 ${
+                          j.is_active
+                            ? 'border-green-400 text-green-600 hover:bg-green-50'
+                            : 'border-stone-300 text-stone-400 hover:bg-stone-50'
+                        }`}
+                      >
+                        {j.is_active ? '掲載中' : '非掲載'}
+                      </button>
+                      {editingJobId === j.id ? (
+                        <button
+                          onClick={cancelEditJob}
+                          className="text-[10px] px-3 py-1 rounded border border-stone-300 text-stone-500 hover:bg-stone-50 transition-colors"
+                        >
+                          閉じる
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => startEditJob(j)}
+                          disabled={!isConfigured}
+                          className="text-[10px] px-3 py-1 rounded border border-stone-400 text-stone-600 hover:bg-stone-50 transition-colors disabled:opacity-40"
+                        >
+                          編集
+                        </button>
+                      )}
+                      <button
+                        onClick={() => deleteJob(j)}
+                        disabled={!isConfigured}
+                        className="text-[10px] px-3 py-1 rounded border border-red-300 text-red-500 hover:bg-red-50 transition-colors disabled:opacity-40"
+                      >
+                        削除
+                      </button>
+                    </div>
+                  </div>
+
+                  {editingJobId === j.id && jobForm && (
+                    <div className="border-t border-stone-100 px-5 py-5 space-y-5">
+                      <JobFormFields f={jobForm} onChange={setJobField} idSuffix={j.id} />
+                      <div className="flex items-center gap-3 pt-2 border-t border-stone-100">
+                        <button
+                          onClick={() => saveEditJob(j.id)}
+                          disabled={!isConfigured || savingJob}
+                          className="px-4 py-1.5 rounded bg-green-500 text-white text-xs hover:bg-green-600 transition-colors disabled:opacity-40"
+                        >
+                          {savingJob ? '保存中...' : '保存'}
+                        </button>
+                        <button
+                          onClick={cancelEditJob}
+                          className="px-4 py-1.5 rounded border border-stone-300 text-stone-500 text-xs hover:bg-stone-50 transition-colors"
+                        >
+                          キャンセル
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </section>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -13,11 +13,56 @@ export const metadata: Metadata = buildMetadata({
 });
 
 // フォールバック用固定データ（Supabase 未設定・接続エラー時のみ使用）
+const FALLBACK_SECTIONS = [
+  {
+    title: '採用メッセージ',
+    body: 'AHNKISMグループでは、技術と人間性を兼ね備えたスタッフが共に成長できる環境を大切にしています。スタイリスト・アイリスト・アシスタントそれぞれのキャリアを、私たちと一緒に築いていきませんか。あなたの「なりたい自分」を全力でサポートします。',
+    items: [] as string[],
+  },
+  {
+    title: 'AHNKISMで働く魅力',
+    body: '働きやすい環境と成長できる仕組みを整えています。',
+    items: [
+      '完全週休2日制で働きやすい環境',
+      '社会保険完備・賞与あり・昇給あり',
+      '技術力向上のための勉強会・セミナー参加支援',
+      '大阪・心斎橋・堀江の好立地サロン',
+      'スタッフ同士の距離が近く、チームワーク抜群',
+    ],
+  },
+  {
+    title: '教育システム',
+    body: '未経験・経験者どちらも安心して働けるよう、段階的な教育システムを用意しています。',
+    items: [
+      '入社後はOJTで基礎から丁寧にサポート',
+      '技術チェックで着実なスキルアップを確認',
+      '薬剤知識・トレンド情報の定期勉強会',
+      '先輩スタイリストによるマンツーマン指導',
+    ],
+  },
+  {
+    title: '大切にしていること',
+    body: '私たちが大切にしているのは、「お客様の笑顔」と「スタッフの成長」です。技術はもちろん、人として成長できる職場を目指しています。',
+    items: [
+      'お客様一人ひとりに真剣に向き合うこと',
+      '仲間を尊重し、助け合う職場文化',
+      'トレンドを追い続ける向上心',
+      '技術と接客の両立',
+    ],
+  },
+];
+
 const FALLBACK_JOBS = [
   { href: '/recruit/stylist',   title: 'スタイリスト募集',  desc: '髪質改善・カラーに強いスタイリストを募集しています。経験者歓迎。' },
   { href: '/recruit/assistant', title: 'アシスタント募集',  desc: 'これから技術を身につけたい方を歓迎。丁寧な研修制度があります。' },
   { href: '/recruit/eyelist',   title: 'アイリスト募集',    desc: 'まつ毛エクステの施術スタッフを募集。経験者・未経験者どちらも歓迎。' },
 ];
+
+type SectionItem = {
+  title: string;
+  body: string;
+  items: string[];
+};
 
 type JobItem = {
   slug: string;
@@ -27,24 +72,35 @@ type JobItem = {
 
 export default async function RecruitPage() {
   // null = フォールバック、[] = 取得成功0件
+  let sections: SectionItem[] | null = null;
   let jobs: JobItem[] | null = null;
 
   const supabase = await createSupabaseServerClient();
-  if (!supabase) {
-    jobs = null;
-  } else {
-    const { data, error } = await supabase
-      .from('recruit_jobs')
-      .select('slug, title, description')
-      .eq('is_active', true)
-      .order('sort_order', { ascending: true });
-
-    if (error) {
-      jobs = null;
-    } else {
-      jobs = data ?? [];
-    }
+  if (supabase) {
+    const [secRes, jobRes] = await Promise.all([
+      supabase
+        .from('recruit_sections')
+        .select('title, body, items')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true }),
+      supabase
+        .from('recruit_jobs')
+        .select('slug, title, description')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true }),
+    ]);
+    sections = secRes.error ? null : (secRes.data ?? []);
+    jobs = jobRes.error ? null : (jobRes.data ?? []);
   }
+
+  const displaySections: SectionItem[] =
+    sections === null
+      ? FALLBACK_SECTIONS
+      : sections.map((s) => ({
+          title: s.title,
+          body: s.body,
+          items: Array.isArray(s.items) ? (s.items as string[]) : [],
+        }));
 
   const cards =
     jobs === null
@@ -56,7 +112,9 @@ export default async function RecruitPage() {
       <div className="pt-20">
         <Breadcrumb items={[{ name: '採用情報', path: '/recruit' }]} />
       </div>
-      <section className="py-16 sm:py-24">
+
+      {/* ページヘッダー */}
+      <section className="py-16 sm:py-24 border-b border-stone-100">
         <Container>
           <SectionTitle
             label="Join Us"
@@ -64,16 +122,67 @@ export default async function RecruitPage() {
             description="AHNKISMグループでは、美容師・アイリストを随時募集しています。"
             center
           />
-          {cards.length > 0 && (
+        </Container>
+      </section>
+
+      {/* 採用本文セクション */}
+      {displaySections.length > 0 && (
+        <section className="py-16 sm:py-20">
+          <Container narrow>
+            <div className="space-y-14">
+              {displaySections.map((sec, i) => (
+                <div key={i}>
+                  <p className="text-[10px] tracking-[0.3em] text-[#C9A96E] uppercase mb-2">
+                    0{i + 1}
+                  </p>
+                  <h2 className="text-xl font-light tracking-wider text-stone-800 mb-4">
+                    {sec.title}
+                  </h2>
+                  {sec.body && (
+                    <p className="text-sm text-stone-500 leading-relaxed mb-5">{sec.body}</p>
+                  )}
+                  {sec.items.length > 0 && (
+                    <ul className="space-y-2">
+                      {sec.items.map((item, j) => (
+                        <li key={j} className="flex items-start gap-3 text-xs text-stone-600">
+                          <span className="text-[#C9A96E] mt-0.5 shrink-0">—</span>
+                          <span className="leading-relaxed">{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
+            </div>
+          </Container>
+        </section>
+      )}
+
+      {/* 募集職種カード */}
+      <section className="py-16 sm:py-20 bg-stone-50">
+        <Container>
+          <p className="text-[10px] tracking-[0.3em] text-[#C9A96E] uppercase mb-2 text-center">
+            Open Positions
+          </p>
+          <h2 className="text-xl font-light tracking-wider text-stone-800 mb-10 text-center">
+            募集職種
+          </h2>
+          {cards.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
               {cards.map((item) => (
-                <div key={item.href} className="border border-stone-200 p-6">
-                  <h2 className="text-base font-light tracking-wider text-stone-800 mb-3">{item.title}</h2>
+                <div key={item.href} className="border border-stone-200 bg-white p-6">
+                  <h3 className="text-base font-light tracking-wider text-stone-800 mb-3">
+                    {item.title}
+                  </h3>
                   <p className="text-xs text-stone-500 leading-relaxed mb-5">{item.desc}</p>
                   <Button href={item.href} variant="outline">詳細を見る</Button>
                 </div>
               ))}
             </div>
+          ) : (
+            <p className="text-center text-xs text-stone-400 tracking-wider">
+              現在募集中の職種はありません
+            </p>
           )}
         </Container>
       </section>
