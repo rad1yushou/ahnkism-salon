@@ -131,6 +131,18 @@ function ItemsEditor({
   const remove = (i: number) => onChange(items.filter((_, idx) => idx !== i));
   const update = (i: number, val: string) =>
     onChange(items.map((v, idx) => (idx === i ? val : v)));
+  const moveUp = (i: number) => {
+    if (i === 0) return;
+    const next = [...items];
+    [next[i - 1], next[i]] = [next[i], next[i - 1]];
+    onChange(next);
+  };
+  const moveDown = (i: number) => {
+    if (i === items.length - 1) return;
+    const next = [...items];
+    [next[i], next[i + 1]] = [next[i + 1], next[i]];
+    onChange(next);
+  };
 
   return (
     <div>
@@ -151,6 +163,22 @@ function ItemsEditor({
               placeholder="例: 完全週休2日制"
               className="flex-1 border border-stone-300 rounded px-2 py-1.5 text-xs text-stone-800 focus:outline-none focus:border-stone-500 bg-white"
             />
+            <button
+              type="button"
+              onClick={() => moveUp(i)}
+              disabled={i === 0}
+              className="shrink-0 text-[10px] px-2 py-1.5 border border-stone-300 text-stone-500 hover:bg-stone-50 rounded transition-colors disabled:opacity-30"
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              onClick={() => moveDown(i)}
+              disabled={i === items.length - 1}
+              className="shrink-0 text-[10px] px-2 py-1.5 border border-stone-300 text-stone-500 hover:bg-stone-50 rounded transition-colors disabled:opacity-30"
+            >
+              ↓
+            </button>
             <button
               type="button"
               onClick={() => remove(i)}
@@ -563,6 +591,20 @@ export default function AdminRecruitPage() {
     await loadSections();
   };
 
+  const moveSec = async (id: string, dir: 'up' | 'down') => {
+    if (!supabase) return;
+    const idx = sections.findIndex((s) => s.id === id);
+    const targetIdx = dir === 'up' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= sections.length) return;
+    const a = sections[idx];
+    const b = sections[targetIdx];
+    await Promise.all([
+      supabase.from('recruit_sections').update({ sort_order: b.sort_order }).eq('id', a.id),
+      supabase.from('recruit_sections').update({ sort_order: a.sort_order }).eq('id', b.id),
+    ]);
+    await loadSections();
+  };
+
   const deleteSec = async (s: RecruitSection) => {
     if (!supabase) return;
     if (!window.confirm(`「${s.title}」を削除しますか？この操作は取り消せません。`)) return;
@@ -749,6 +791,20 @@ export default function AdminRecruitPage() {
     await loadJobs();
   };
 
+  const moveJob = async (id: string, dir: 'up' | 'down') => {
+    if (!supabase) return;
+    const idx = jobs.findIndex((j) => j.id === id);
+    const targetIdx = dir === 'up' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= jobs.length) return;
+    const a = jobs[idx];
+    const b = jobs[targetIdx];
+    await Promise.all([
+      supabase.from('recruit_jobs').update({ sort_order: b.sort_order }).eq('id', a.id),
+      supabase.from('recruit_jobs').update({ sort_order: a.sort_order }).eq('id', b.id),
+    ]);
+    await loadJobs();
+  };
+
   const deleteJob = async (j: Job) => {
     if (!supabase) return;
     if (!window.confirm(`「${j.title}」を削除しますか？この操作は取り消せません。`)) return;
@@ -874,7 +930,7 @@ export default function AdminRecruitPage() {
                 }}
               />
 
-              {sections.map((s) => (
+              {sections.map((s, si) => (
                 <section key={s.id} className="bg-white border border-stone-200 rounded-lg">
                   <div className="flex items-center justify-between px-5 py-4">
                     <div className="flex items-center gap-3">
@@ -893,6 +949,20 @@ export default function AdminRecruitPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => moveSec(s.id, 'up')}
+                        disabled={!isConfigured || si === 0}
+                        className="text-[10px] px-2 py-1 rounded border border-stone-300 text-stone-500 hover:bg-stone-50 transition-colors disabled:opacity-30"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        onClick={() => moveSec(s.id, 'down')}
+                        disabled={!isConfigured || si === sections.length - 1}
+                        className="text-[10px] px-2 py-1 rounded border border-stone-300 text-stone-500 hover:bg-stone-50 transition-colors disabled:opacity-30"
+                      >
+                        ↓
+                      </button>
                       <button
                         onClick={() => toggleActiveSec(s)}
                         disabled={!isConfigured}
@@ -1060,7 +1130,7 @@ export default function AdminRecruitPage() {
             <p className="text-xs text-stone-400">職種がありません</p>
           ) : (
             <div className="space-y-4">
-              {jobs.map((j) => (
+              {jobs.map((j, ji) => (
                 <section key={j.id} className="bg-white border border-stone-200 rounded-lg">
                   <div className="flex items-center justify-between px-5 py-4">
                     <div className="flex items-center gap-3">
@@ -1079,6 +1149,20 @@ export default function AdminRecruitPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => moveJob(j.id, 'up')}
+                        disabled={!isConfigured || ji === 0}
+                        className="text-[10px] px-2 py-1 rounded border border-stone-300 text-stone-500 hover:bg-stone-50 transition-colors disabled:opacity-30"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        onClick={() => moveJob(j.id, 'down')}
+                        disabled={!isConfigured || ji === jobs.length - 1}
+                        className="text-[10px] px-2 py-1 rounded border border-stone-300 text-stone-500 hover:bg-stone-50 transition-colors disabled:opacity-30"
+                      >
+                        ↓
+                      </button>
                       <button
                         onClick={() => toggleActiveJob(j)}
                         disabled={!isConfigured}
