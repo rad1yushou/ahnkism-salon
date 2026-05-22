@@ -92,7 +92,7 @@ export default async function MenusSection() {
         />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
           {featured.map((menu) => (
-            <MenuCard key={menu.slug} menu={menu} imageUrl={menu.imageUrl} mediaUrl={menu.mediaUrl} mediaType={menu.mediaType} mediaAspect={menu.mediaAspect} mediaPosition={menu.mediaPosition} />
+            <MenuCard key={menu.slug} menu={menu} />
           ))}
         </div>
         <div className="text-center">
