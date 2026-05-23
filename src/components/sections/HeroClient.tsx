@@ -250,7 +250,7 @@ export default function HeroClient({ slides, pickups }: Props) {
       </div>
 
       {/* ── Scroll indicator ── */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
+      <div className="hidden sm:flex absolute bottom-8 left-1/2 -translate-x-1/2 flex-col items-center gap-2">
         <span className="text-[10px] tracking-widest text-stone-400 uppercase">Scroll</span>
         <div className="w-px h-10 bg-stone-300 animate-pulse" />
       </div>
