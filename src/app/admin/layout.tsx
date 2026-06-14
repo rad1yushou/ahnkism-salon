@@ -19,6 +19,7 @@ const FALLBACK_NAV: NavItem[] = [
   { href: '/admin/dashboard',     label: 'ダッシュボード', icon: '▤' },
   { href: '/admin/images',        label: '画像管理',       icon: '🖼' },
   { href: '/admin/salons',        label: '店舗管理',       icon: '🏠' },
+  { href: '/admin/salon-lp',      label: '店舗LP',         icon: '◈' },
   { href: '/admin/menus',         label: 'メニュー管理',   icon: '✂' },
   { href: '/admin/staff',         label: 'スタッフ管理',   icon: '👤' },
   { href: '/admin/reasons',       label: '選ばれる理由',   icon: '★' },
