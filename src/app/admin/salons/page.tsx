@@ -39,6 +39,7 @@ type Salon = {
   google_map_url: string | null;
   hotpepper_url: string | null;
   instagram_url: string | null;
+  line_url: string | null;
   image_url: string | null;
   sort_order: number;
   is_active: boolean;
@@ -63,6 +64,7 @@ function toEditForm(salon: Salon): EditForm {
     google_map_url: salon.google_map_url,
     hotpepper_url: salon.hotpepper_url,
     instagram_url: salon.instagram_url,
+    line_url: salon.line_url,
     image_url: salon.image_url,
     sort_order: salon.sort_order,
     is_active: salon.is_active,
@@ -187,6 +189,7 @@ export default function AdminSalonsPage() {
         google_map_url: form.google_map_url || null,
         hotpepper_url: form.hotpepper_url || null,
         instagram_url: form.instagram_url || null,
+        line_url: form.line_url || null,
         image_url: form.image_url || null,
         sort_order: form.sort_order,
         is_active: form.is_active,
@@ -447,6 +450,12 @@ export default function AdminSalonsPage() {
                         value={form.instagram_url}
                         onChange={v => setField('instagram_url', v)}
                         placeholder="https://www.instagram.com/..."
+                      />
+                      <Field
+                        label="LINE 予約 URL"
+                        value={form.line_url}
+                        onChange={v => setField('line_url', v)}
+                        placeholder="https://line.me/..."
                       />
                     </div>
                   </div>
