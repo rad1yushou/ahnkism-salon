@@ -51,14 +51,14 @@ export default function SalonHeroSlider({
               loop
               playsInline
               preload="metadata"
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain scale-110 sm:scale-100 sm:object-cover"
             />
           ) : (
             <Image
               src={slide.media_url}
               alt={salonName}
               fill
-              className="object-cover"
+              className="object-contain scale-110 sm:scale-100 sm:object-cover"
               priority={i === 0}
               unoptimized
             />
