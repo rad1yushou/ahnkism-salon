@@ -117,10 +117,12 @@ export default async function RecruitPage() {
   // null = フォールバック、[] = 取得成功0件
   let sections: SectionItem[] | null = null;
   let jobs: JobItem[] | null = null;
+  let heroMediaUrl: string | null = null;
+  let heroMediaType: string | null = null;
 
   const supabase = await createSupabaseServerClient();
   if (supabase) {
-    const [secRes, jobRes] = await Promise.all([
+    const [secRes, jobRes, heroRes] = await Promise.all([
       supabase
         .from('recruit_sections')
         .select('title, body, items, media_url, media_type, media_layout, media_aspect, media_position')
@@ -131,9 +133,19 @@ export default async function RecruitPage() {
         .select('slug, title, description')
         .eq('is_active', true)
         .order('sort_order', { ascending: true }),
+      supabase
+        .from('recruit_hero')
+        .select('media_url, media_type')
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle(),
     ]);
     sections = secRes.error ? null : (secRes.data ?? []);
     jobs = jobRes.error ? null : (jobRes.data ?? []);
+    if (!heroRes.error && heroRes.data?.media_url) {
+      heroMediaUrl = heroRes.data.media_url;
+      heroMediaType = heroRes.data.media_type ?? null;
+    }
   }
 
   const displaySections: SectionItem[] =
@@ -157,21 +169,55 @@ export default async function RecruitPage() {
 
   return (
     <>
-      <div className="pt-20">
-        <Breadcrumb items={[{ name: '採用情報', path: '/recruit' }]} />
-      </div>
+      {/* ── HERO ── */}
+      {heroMediaUrl ? (
+        <div className="relative w-full aspect-video sm:h-[60vh] sm:aspect-auto overflow-hidden bg-stone-900 pt-14 sm:pt-16">
+          {heroMediaType === 'video' ? (
+            <LazyAutoPlayVideo
+              src={heroMediaUrl}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <Image
+              src={heroMediaUrl}
+              alt="採用情報"
+              fill
+              className="object-cover"
+              priority
+              unoptimized
+            />
+          )}
+          <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-center px-6">
+            <p className="text-[10px] tracking-[0.3em] text-stone-300 uppercase mb-3">Join Us</p>
+            <h1 className="text-3xl sm:text-5xl font-light tracking-widest text-white">採用情報</h1>
+          </div>
+        </div>
+      ) : (
+        <div className="pt-20">
+          <Breadcrumb items={[{ name: '採用情報', path: '/recruit' }]} />
+        </div>
+      )}
 
-      {/* ページヘッダー */}
-      <section className="py-16 sm:py-24 border-b border-stone-100">
-        <Container>
-          <SectionTitle
-            label="Join Us"
-            title="採用情報"
-            description="AHNKISMグループでは、美容師・アイリストを随時募集しています。"
-            center
-          />
-        </Container>
-      </section>
+      {/* HEROがある場合のBreadcrumb */}
+      {heroMediaUrl && (
+        <div className="px-5 sm:px-8 py-3 max-w-screen-lg mx-auto">
+          <Breadcrumb items={[{ name: '採用情報', path: '/recruit' }]} />
+        </div>
+      )}
+
+      {/* ページヘッダー（HEROがない場合のみ表示） */}
+      {!heroMediaUrl && (
+        <section className="py-16 sm:py-24 border-b border-stone-100">
+          <Container>
+            <SectionTitle
+              label="Join Us"
+              title="採用情報"
+              description="AHNKISMグループでは、美容師・アイリストを随時募集しています。"
+              center
+            />
+          </Container>
+        </section>
+      )}
 
       {/* 採用本文セクション */}
       {displaySections.length > 0 && (

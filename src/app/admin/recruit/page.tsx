@@ -546,7 +546,7 @@ export default function AdminRecruitPage() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const isConfigured = !!supabase;
 
-  const [activeTab, setActiveTab] = useState<'sections' | 'jobs' | 'contact'>('sections');
+  const [activeTab, setActiveTab] = useState<'sections' | 'jobs' | 'contact' | 'hero'>('sections');
   const [message, setMessage] = useState('');
 
   const showMessage = (msg: string) => {
@@ -567,6 +567,7 @@ export default function AdminRecruitPage() {
   const [newSecForm, setNewSecForm] = useState<SectionForm>({ ...EMPTY_SECTION_FORM });
   const [savingNewSec, setSavingNewSec] = useState(false);
   const mediaFileRef = useRef<HTMLInputElement>(null);
+  const heroFileRef = useRef<HTMLInputElement>(null);
 
   const loadSections = useCallback(async () => {
     if (!supabase) { setLoadingSec(false); return; }
@@ -970,6 +971,101 @@ export default function AdminRecruitPage() {
   };
 
   // ----------------------------------------------------------
+  // HERO メディア state
+  // ----------------------------------------------------------
+  type HeroMedia = {
+    id: string;
+    media_url: string | null;
+    media_type: 'image' | 'video' | null;
+    is_active: boolean;
+  };
+
+  const [heroMedia, setHeroMedia] = useState<HeroMedia | null>(null);
+  const [loadingHero, setLoadingHero] = useState(true);
+  const [savingHero, setSavingHero] = useState(false);
+  const [uploadingHero, setUploadingHero] = useState(false);
+
+  const loadHero = useCallback(async () => {
+    if (!supabase) { setLoadingHero(false); return; }
+    setLoadingHero(true);
+    const { data } = await supabase
+      .from('recruit_hero')
+      .select('id, media_url, media_type, is_active')
+      .limit(1)
+      .maybeSingle();
+    setHeroMedia(data ? {
+      id: data.id,
+      media_url: data.media_url ?? null,
+      media_type: (data.media_type ?? null) as 'image' | 'video' | null,
+      is_active: data.is_active,
+    } : null);
+    setLoadingHero(false);
+  }, [supabase]);
+
+  useEffect(() => { loadHero(); }, [loadHero]);
+
+  const uploadHeroMedia = async (file: File) => {
+    if (!supabase || !heroMedia) return;
+    const isImage = IMAGE_TYPES.includes(file.type);
+    const isVideo = MEDIA_VIDEO_TYPES.includes(file.type);
+    if (!isImage && !isVideo) { showMessage('jpg / png / webp / gif / mp4 / mov / webm のみアップロードできます'); return; }
+    if (isImage && file.size > IMAGE_MAX_SIZE) { showMessage('画像は 5MB 以下にしてください'); return; }
+    if (isVideo && file.size > MEDIA_MAX_VIDEO_SIZE) { showMessage('動画は 50MB 以下にしてください'); return; }
+    setUploadingHero(true);
+    try {
+      const ext = file.name.split('.').pop()?.toLowerCase() ?? 'mp4';
+      const path = `recruit/hero/${Date.now()}.${ext}`;
+      const { error: uploadErr } = await supabase.storage.from(BUCKET).upload(path, file);
+      if (uploadErr) { showMessage(`アップロード失敗: ${uploadErr.message}`); return; }
+      const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(path);
+      if (heroMedia.media_url) {
+        const oldPath = extractStoragePath(heroMedia.media_url);
+        if (oldPath) await supabase.storage.from(BUCKET).remove([oldPath]);
+      }
+      const mediaType: 'image' | 'video' = isVideo ? 'video' : 'image';
+      const { error: dbErr } = await supabase
+        .from('recruit_hero')
+        .update({ media_url: publicUrl, media_type: mediaType, is_active: true })
+        .eq('id', heroMedia.id);
+      if (dbErr) { showMessage(`DB保存失敗: ${dbErr.message}`); return; }
+      showMessage('HEROメディアをアップロードしました');
+      await loadHero();
+    } finally {
+      setUploadingHero(false);
+      if (heroFileRef.current) heroFileRef.current.value = '';
+    }
+  };
+
+  const deleteHeroMedia = async () => {
+    if (!supabase || !heroMedia) return;
+    if (!window.confirm('HEROメディアを削除しますか？')) return;
+    if (heroMedia.media_url) {
+      const oldPath = extractStoragePath(heroMedia.media_url);
+      if (oldPath) await supabase.storage.from(BUCKET).remove([oldPath]);
+    }
+    const { error } = await supabase
+      .from('recruit_hero')
+      .update({ media_url: null, media_type: null, is_active: false })
+      .eq('id', heroMedia.id);
+    if (error) { showMessage(`削除失敗: ${error.message}`); return; }
+    showMessage('HEROメディアを削除しました');
+    await loadHero();
+  };
+
+  const saveHeroActive = async (isActive: boolean) => {
+    if (!supabase || !heroMedia) return;
+    setSavingHero(true);
+    const { error } = await supabase
+      .from('recruit_hero')
+      .update({ is_active: isActive })
+      .eq('id', heroMedia.id);
+    setSavingHero(false);
+    if (error) { showMessage(`保存失敗: ${error.message}`); return; }
+    showMessage('保存しました');
+    await loadHero();
+  };
+
+  // ----------------------------------------------------------
   // レンダー
   // ----------------------------------------------------------
   return (
@@ -1017,13 +1113,23 @@ export default function AdminRecruitPage() {
         </button>
         <button
           onClick={() => setActiveTab('contact')}
-          className={`pb-3 px-1 text-xs tracking-wider border-b-2 transition-colors ${
+          className={`pb-3 px-1 mr-6 text-xs tracking-wider border-b-2 transition-colors ${
             activeTab === 'contact'
               ? 'border-stone-800 text-stone-800'
               : 'border-transparent text-stone-400 hover:text-stone-600'
           }`}
         >
           問い合わせ先
+        </button>
+        <button
+          onClick={() => setActiveTab('hero')}
+          className={`pb-3 px-1 text-xs tracking-wider border-b-2 transition-colors ${
+            activeTab === 'hero'
+              ? 'border-stone-800 text-stone-800'
+              : 'border-transparent text-stone-400 hover:text-stone-600'
+          }`}
+        >
+          HERO
         </button>
       </div>
 
@@ -1387,6 +1493,101 @@ export default function AdminRecruitPage() {
                 </section>
               ))}
             </div>
+          )}
+        </div>
+      )}
+
+      {/* ========== HERO タブ ========== */}
+      {activeTab === 'hero' && (
+        <div className="space-y-4">
+          <p className="text-xs text-stone-400">
+            採用ページ最上部に表示する HERO 動画・画像を管理します。未設定の場合は従来のヘッダー表示になります。
+          </p>
+
+          {/* hidden file input */}
+          <input
+            ref={heroFileRef}
+            type="file"
+            accept=".jpg,.jpeg,.png,.webp,.gif,.mp4,.mov,.webm"
+            className="hidden"
+            disabled={!isConfigured || uploadingHero}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) uploadHeroMedia(file);
+            }}
+          />
+
+          {loadingHero ? (
+            <p className="text-xs text-stone-400">読み込み中...</p>
+          ) : (
+            <section className="bg-white border border-stone-200 rounded-lg">
+              <div className="px-5 py-5 space-y-5">
+                {/* プレビュー */}
+                {heroMedia?.media_url && (
+                  <div>
+                    <p className="text-[10px] tracking-widest text-stone-500 mb-2">現在のHEROメディア</p>
+                    <div className="w-full aspect-video bg-stone-100 rounded overflow-hidden relative mb-2">
+                      {heroMedia.media_type === 'video' ? (
+                        <video
+                          src={heroMedia.media_url}
+                          className="w-full h-full object-cover"
+                          muted
+                          playsInline
+                        />
+                      ) : (
+                        <img
+                          src={heroMedia.media_url}
+                          alt="HERO"
+                          className="w-full h-full object-cover"
+                        />
+                      )}
+                    </div>
+                    <p className="text-[10px] text-stone-400 truncate max-w-sm">{heroMedia.media_url}</p>
+                  </div>
+                )}
+
+                {/* アップロード */}
+                <div>
+                  <p className="text-[10px] tracking-widest text-stone-500 mb-2">メディアをアップロード</p>
+                  <button
+                    onClick={() => heroFileRef.current?.click()}
+                    disabled={!isConfigured || uploadingHero}
+                    className="text-[10px] py-1.5 px-3 border border-stone-300 text-stone-600 hover:bg-stone-50 rounded transition-colors disabled:opacity-40"
+                  >
+                    {uploadingHero ? 'アップロード中...' : heroMedia?.media_url ? 'メディアを差し替え' : 'メディアをアップロード'}
+                  </button>
+                  <p className="text-[10px] text-stone-400 mt-1">
+                    画像: jpg / png / webp / gif（5MB以下）　動画: mp4 / mov / webm（50MB以下）
+                  </p>
+                </div>
+
+                {/* 公開設定 */}
+                {heroMedia?.media_url && (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <input
+                        id="hero_is_active"
+                        type="checkbox"
+                        checked={heroMedia.is_active}
+                        onChange={(e) => saveHeroActive(e.target.checked)}
+                        disabled={!isConfigured || savingHero}
+                        className="rounded border-stone-300"
+                      />
+                      <label htmlFor="hero_is_active" className="text-xs text-stone-600">
+                        公開する（チェックを外すと採用ページ上部に表示されません）
+                      </label>
+                    </div>
+                    <button
+                      onClick={deleteHeroMedia}
+                      disabled={!isConfigured || uploadingHero}
+                      className="text-[10px] py-1 px-2 border border-red-300 text-red-500 hover:bg-red-50 rounded transition-colors disabled:opacity-40"
+                    >
+                      HEROメディアを削除
+                    </button>
+                  </div>
+                )}
+              </div>
+            </section>
           )}
         </div>
       )}
