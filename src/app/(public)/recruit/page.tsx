@@ -119,6 +119,8 @@ export default async function RecruitPage() {
   let jobs: JobItem[] | null = null;
   let heroMediaUrl: string | null = null;
   let heroMediaType: string | null = null;
+  let heroTitlePosition: string = 'center';
+  let heroTitleY: number = 50;
 
   const supabase = await createSupabaseServerClient();
   if (supabase) {
@@ -135,7 +137,7 @@ export default async function RecruitPage() {
         .order('sort_order', { ascending: true }),
       supabase
         .from('recruit_hero')
-        .select('media_url, media_type')
+        .select('media_url, media_type, hero_title_position, hero_title_y_percent')
         .eq('is_active', true)
         .limit(1)
         .maybeSingle(),
@@ -145,6 +147,8 @@ export default async function RecruitPage() {
     if (!heroRes.error && heroRes.data?.media_url) {
       heroMediaUrl = heroRes.data.media_url;
       heroMediaType = heroRes.data.media_type ?? null;
+      heroTitlePosition = heroRes.data.hero_title_position ?? 'center';
+      heroTitleY = heroRes.data.hero_title_y_percent ?? 50;
     }
   }
 
@@ -187,7 +191,19 @@ export default async function RecruitPage() {
               unoptimized
             />
           )}
-          <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-center px-6">
+          {/* グラデーションオーバーレイ */}
+          {heroTitlePosition === 'top' ? (
+            <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/10 to-transparent" />
+          ) : heroTitlePosition === 'bottom' ? (
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+          ) : (
+            <div className="absolute inset-0 bg-black/35" />
+          )}
+          {/* テキスト */}
+          <div
+            className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 text-center px-6 w-full"
+            style={{ top: `${heroTitleY}%` }}
+          >
             <p className="text-[10px] tracking-[0.3em] text-stone-300 uppercase mb-3">Join Us</p>
             <h1 className="text-3xl sm:text-5xl font-light tracking-widest text-white">採用情報</h1>
           </div>

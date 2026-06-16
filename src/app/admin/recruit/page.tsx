@@ -978,6 +978,8 @@ export default function AdminRecruitPage() {
     media_url: string | null;
     media_type: 'image' | 'video' | null;
     is_active: boolean;
+    hero_title_position: 'top' | 'center' | 'bottom';
+    hero_title_y_percent: number;
   };
 
   const [heroMedia, setHeroMedia] = useState<HeroMedia | null>(null);
@@ -990,7 +992,7 @@ export default function AdminRecruitPage() {
     setLoadingHero(true);
     const { data } = await supabase
       .from('recruit_hero')
-      .select('id, media_url, media_type, is_active')
+      .select('id, media_url, media_type, is_active, hero_title_position, hero_title_y_percent')
       .limit(1)
       .maybeSingle();
     setHeroMedia(data ? {
@@ -998,6 +1000,8 @@ export default function AdminRecruitPage() {
       media_url: data.media_url ?? null,
       media_type: (data.media_type ?? null) as 'image' | 'video' | null,
       is_active: data.is_active,
+      hero_title_position: (data.hero_title_position ?? 'center') as 'top' | 'center' | 'bottom',
+      hero_title_y_percent: data.hero_title_y_percent ?? 50,
     } : null);
     setLoadingHero(false);
   }, [supabase]);
@@ -1062,6 +1066,19 @@ export default function AdminRecruitPage() {
     setSavingHero(false);
     if (error) { showMessage(`保存失敗: ${error.message}`); return; }
     showMessage('保存しました');
+    await loadHero();
+  };
+
+  const saveHeroTitlePosition = async (y: number, pos: 'top' | 'center' | 'bottom') => {
+    if (!supabase || !heroMedia) return;
+    setSavingHero(true);
+    const { error } = await supabase
+      .from('recruit_hero')
+      .update({ hero_title_y_percent: y, hero_title_position: pos })
+      .eq('id', heroMedia.id);
+    setSavingHero(false);
+    if (error) { showMessage(`保存失敗: ${error.message}`); return; }
+    showMessage('文字位置を保存しました');
     await loadHero();
   };
 
@@ -1584,6 +1601,61 @@ export default function AdminRecruitPage() {
                     >
                       HEROメディアを削除
                     </button>
+                  </div>
+                )}
+
+                {/* 文字位置調整 */}
+                {heroMedia?.media_url && (
+                  <div>
+                    <p className="text-[10px] tracking-widest text-stone-500 mb-3">文字の縦位置</p>
+                    {/* 目安ボタン */}
+                    <div className="flex gap-2 mb-3">
+                      {([
+                        { label: '上', y: 22, pos: 'top' },
+                        { label: '中央', y: 50, pos: 'center' },
+                        { label: '下', y: 78, pos: 'bottom' },
+                      ] as const).map(({ label, y, pos }) => (
+                        <button
+                          key={pos}
+                          type="button"
+                          onClick={() => saveHeroTitlePosition(y, pos)}
+                          disabled={savingHero}
+                          className={`text-xs px-3 py-1 border transition-colors disabled:opacity-40 ${heroMedia.hero_title_position === pos ? 'bg-stone-800 text-white border-stone-800' : 'text-stone-600 border-stone-300 hover:border-stone-500'}`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    {/* スライダー */}
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="range"
+                        min={10}
+                        max={90}
+                        value={heroMedia.hero_title_y_percent}
+                        onChange={e => {
+                          const y = Number(e.target.value);
+                          const pos: 'top' | 'center' | 'bottom' =
+                            y <= 33 ? 'top' : y <= 66 ? 'center' : 'bottom';
+                          setHeroMedia(prev => prev ? { ...prev, hero_title_y_percent: y, hero_title_position: pos } : prev);
+                        }}
+                        onMouseUp={e => {
+                          const y = Number((e.target as HTMLInputElement).value);
+                          const pos: 'top' | 'center' | 'bottom' =
+                            y <= 33 ? 'top' : y <= 66 ? 'center' : 'bottom';
+                          saveHeroTitlePosition(y, pos);
+                        }}
+                        onTouchEnd={e => {
+                          const y = Number((e.target as HTMLInputElement).value);
+                          const pos: 'top' | 'center' | 'bottom' =
+                            y <= 33 ? 'top' : y <= 66 ? 'center' : 'bottom';
+                          saveHeroTitlePosition(y, pos);
+                        }}
+                        className="flex-1 accent-stone-600"
+                      />
+                      <span className="text-xs text-stone-500 w-14 shrink-0">現在位置 {heroMedia.hero_title_y_percent}%</span>
+                    </div>
+                    <p className="text-[10px] text-stone-400 mt-1">スライダーを離したタイミングで自動保存されます</p>
                   </div>
                 )}
               </div>
