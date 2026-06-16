@@ -36,6 +36,7 @@ type LpSection = {
   media_aspect: string;
   media_position: string;
   hero_title_position: string;
+  hero_title_y_percent: number;
   sort_order: number;
 };
 
@@ -93,7 +94,7 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
         .order('sort_order', { ascending: true }),
       supabase
         .from('salon_lp_sections')
-        .select('id, section_type, title, body, media_url, media_type, media_aspect, media_position, hero_title_position, sort_order')
+        .select('id, section_type, title, body, media_url, media_type, media_aspect, media_position, hero_title_position, hero_title_y_percent, sort_order')
         .eq('salon_slug', slug)
         .eq('is_active', true)
         .order('sort_order', { ascending: true }),
@@ -189,13 +190,10 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
             <div className="absolute inset-0 bg-black/35" />
           )}
           {/* 店舗名テキスト */}
-          <div className={`absolute inset-0 flex flex-col items-center text-center px-6 ${
-            heroSection.hero_title_position === 'top'
-              ? 'justify-start pt-16 sm:pt-24'
-              : heroSection.hero_title_position === 'bottom'
-              ? 'justify-end pb-16 sm:pb-24'
-              : 'justify-center'
-          }`}>
+          <div
+            className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 text-center px-6 w-full"
+            style={{ top: `${heroSection.hero_title_y_percent ?? 50}%` }}
+          >
             <p className="text-[10px] tracking-[0.3em] text-stone-300 uppercase mb-3">
               {salon.shortName}
             </p>

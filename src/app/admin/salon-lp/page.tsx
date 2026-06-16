@@ -11,7 +11,7 @@ const VIDEO_MAX_SIZE = 50 * 1024 * 1024;
 const BUCKET = 'ahnkism-public';
 
 // Supabase select フィールド（1行で定義）
-const LP_SECTION_SELECT = 'id, salon_slug, section_type, title, body, media_url, media_type, media_aspect, media_position, hero_title_position, sort_order, is_active';
+const LP_SECTION_SELECT = 'id, salon_slug, section_type, title, body, media_url, media_type, media_aspect, media_position, hero_title_position, hero_title_y_percent, sort_order, is_active';
 
 const SALON_SLUGS = ['labo', 'nit', 'elu', 'olea'] as const;
 type SalonSlug = typeof SALON_SLUGS[number];
@@ -58,6 +58,7 @@ type LpSection = {
   media_aspect: 'video' | 'portrait' | 'square' | 'vertical';
   media_position: 'center' | 'top' | 'bottom' | 'left' | 'right';
   hero_title_position: 'top' | 'center' | 'bottom';
+  hero_title_y_percent: number;
   sort_order: number;
   is_active: boolean;
 };
@@ -68,6 +69,7 @@ type SectionForm = {
   media_aspect: 'video' | 'portrait' | 'square' | 'vertical';
   media_position: 'center' | 'top' | 'bottom' | 'left' | 'right';
   hero_title_position: 'top' | 'center' | 'bottom';
+  hero_title_y_percent: number;
   is_active: boolean;
 };
 
@@ -113,6 +115,7 @@ export default function AdminSalonLpPage() {
       media_aspect: (r.media_aspect ?? 'video') as LpSection['media_aspect'],
       media_position: (r.media_position ?? 'center') as LpSection['media_position'],
       hero_title_position: (r.hero_title_position ?? 'center') as LpSection['hero_title_position'],
+      hero_title_y_percent: r.hero_title_y_percent ?? 50,
       sort_order: r.sort_order,
       is_active: r.is_active,
     })));
@@ -136,6 +139,7 @@ export default function AdminSalonLpPage() {
       media_aspect: sec.media_aspect,
       media_position: sec.media_position,
       hero_title_position: sec.hero_title_position,
+      hero_title_y_percent: sec.hero_title_y_percent,
       is_active: sec.is_active,
     });
   };
@@ -156,6 +160,7 @@ export default function AdminSalonLpPage() {
         media_aspect: form.media_aspect,
         media_position: form.media_position,
         hero_title_position: form.hero_title_position,
+        hero_title_y_percent: form.hero_title_y_percent,
         is_active: form.is_active,
       })
       .eq('id', sectionId);
@@ -439,16 +444,45 @@ export default function AdminSalonLpPage() {
                     {/* 店舗名テキスト位置（hero のみ） */}
                     {sec.section_type === 'hero' && (
                       <div>
-                        <label className="block text-[10px] tracking-widest text-stone-500 mb-2">店舗名の表示位置</label>
-                        <select
-                          value={form.hero_title_position}
-                          onChange={e => setField('hero_title_position', e.target.value as SectionForm['hero_title_position'])}
-                          className="text-xs text-stone-700 border border-stone-200 px-3 py-1.5 focus:outline-none focus:border-stone-400"
-                        >
-                          <option value="top">上</option>
-                          <option value="center">中央</option>
-                          <option value="bottom">下</option>
-                        </select>
+                        <label className="block text-[10px] tracking-widest text-stone-500 mb-2">店舗名の縦位置</label>
+                        {/* 目安ボタン */}
+                        <div className="flex gap-2 mb-3">
+                          {([
+                            { label: '上', y: 22, pos: 'top' },
+                            { label: '中央', y: 50, pos: 'center' },
+                            { label: '下', y: 78, pos: 'bottom' },
+                          ] as const).map(({ label: l, y, pos }) => (
+                            <button
+                              key={pos}
+                              type="button"
+                              onClick={() => {
+                                setField('hero_title_y_percent', y);
+                                setField('hero_title_position', pos);
+                              }}
+                              className={`text-xs px-3 py-1 border transition-colors ${form.hero_title_position === pos ? 'bg-stone-800 text-white border-stone-800' : 'text-stone-600 border-stone-300 hover:border-stone-500'}`}
+                            >
+                              {l}
+                            </button>
+                          ))}
+                        </div>
+                        {/* スライダー */}
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="range"
+                            min={10}
+                            max={90}
+                            value={form.hero_title_y_percent}
+                            onChange={e => {
+                              const y = Number(e.target.value);
+                              const pos: SectionForm['hero_title_position'] =
+                                y <= 33 ? 'top' : y <= 66 ? 'center' : 'bottom';
+                              setField('hero_title_y_percent', y);
+                              setField('hero_title_position', pos);
+                            }}
+                            className="flex-1 accent-stone-600"
+                          />
+                          <span className="text-xs text-stone-500 w-14 shrink-0">現在位置 {form.hero_title_y_percent}%</span>
+                        </div>
                       </div>
                     )}
 
