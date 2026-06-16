@@ -77,7 +77,7 @@ export default function SalonHeroSlider({
 
       {/* 店舗名テキスト */}
       <div
-        className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 text-center px-6 w-full z-10"
+        className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 text-center px-6 w-full z-10 -mt-[5vh] sm:mt-0"
         style={{ top: `${titleY}%` }}
       >
         <p className="text-[10px] tracking-[0.3em] text-stone-300 uppercase mb-3">
