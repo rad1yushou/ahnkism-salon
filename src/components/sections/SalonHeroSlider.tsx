@@ -37,7 +37,7 @@ export default function SalonHeroSlider({
   if (total === 0) return null;
 
   return (
-    <div className="relative w-full aspect-video sm:h-[70vh] sm:aspect-auto overflow-hidden bg-stone-900">
+    <div className="relative w-full h-[70vh] overflow-hidden bg-stone-900">
       {slides.map((slide, i) => (
         <div
           key={i}
