@@ -37,7 +37,7 @@ export default function SalonHeroSlider({
   if (total === 0) return null;
 
   return (
-    <div className="relative w-full h-[56vh] sm:h-[70vh] overflow-hidden bg-stone-900">
+    <div className="relative w-full h-[45vh] sm:h-[70vh] overflow-hidden bg-stone-900">
       {slides.map((slide, i) => (
         <div
           key={i}
@@ -77,7 +77,7 @@ export default function SalonHeroSlider({
 
       {/* 店舗名テキスト */}
       <div
-        className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 text-center px-6 w-full z-10 -mt-[5vh] sm:mt-0"
+        className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 text-center px-6 w-full z-10"
         style={{ top: `${titleY}%` }}
       >
         <p className="text-[10px] tracking-[0.3em] text-stone-300 uppercase mb-3">
