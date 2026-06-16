@@ -37,7 +37,7 @@ export default function SalonHeroSlider({
   if (total === 0) return null;
 
   return (
-    <div className="relative w-full h-[70vh] overflow-hidden bg-stone-900">
+    <div className="relative w-full h-[56vh] sm:h-[70vh] overflow-hidden bg-stone-900">
       {slides.map((slide, i) => (
         <div
           key={i}
@@ -51,14 +51,14 @@ export default function SalonHeroSlider({
               loop
               playsInline
               preload="metadata"
-              className="w-full h-full object-contain sm:object-cover"
+              className="w-full h-full object-cover"
             />
           ) : (
             <Image
               src={slide.media_url}
               alt={salonName}
               fill
-              className="object-contain sm:object-cover"
+              className="object-cover"
               priority={i === 0}
               unoptimized
             />
