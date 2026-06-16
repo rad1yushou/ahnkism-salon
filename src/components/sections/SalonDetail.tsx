@@ -35,6 +35,7 @@ type LpSection = {
   media_type: string | null;
   media_aspect: string;
   media_position: string;
+  hero_title_position: string;
   sort_order: number;
 };
 
@@ -92,7 +93,7 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
         .order('sort_order', { ascending: true }),
       supabase
         .from('salon_lp_sections')
-        .select('id, section_type, title, body, media_url, media_type, media_aspect, media_position, sort_order')
+        .select('id, section_type, title, body, media_url, media_type, media_aspect, media_position, hero_title_position, sort_order')
         .eq('salon_slug', slug)
         .eq('is_active', true)
         .order('sort_order', { ascending: true }),
@@ -179,7 +180,22 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
               unoptimized
             />
           )}
-          <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-center px-6">
+          {/* グラデーションオーバーレイ */}
+          {heroSection.hero_title_position === 'top' ? (
+            <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/10 to-transparent" />
+          ) : heroSection.hero_title_position === 'bottom' ? (
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+          ) : (
+            <div className="absolute inset-0 bg-black/35" />
+          )}
+          {/* 店舗名テキスト */}
+          <div className={`absolute inset-0 flex flex-col items-center text-center px-6 ${
+            heroSection.hero_title_position === 'top'
+              ? 'justify-start pt-16 sm:pt-24'
+              : heroSection.hero_title_position === 'bottom'
+              ? 'justify-end pb-16 sm:pb-24'
+              : 'justify-center'
+          }`}>
             <p className="text-[10px] tracking-[0.3em] text-stone-300 uppercase mb-3">
               {salon.shortName}
             </p>

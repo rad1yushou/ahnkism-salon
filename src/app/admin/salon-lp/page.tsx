@@ -11,7 +11,7 @@ const VIDEO_MAX_SIZE = 50 * 1024 * 1024;
 const BUCKET = 'ahnkism-public';
 
 // Supabase select フィールド（1行で定義）
-const LP_SECTION_SELECT = 'id, salon_slug, section_type, title, body, media_url, media_type, media_aspect, media_position, sort_order, is_active';
+const LP_SECTION_SELECT = 'id, salon_slug, section_type, title, body, media_url, media_type, media_aspect, media_position, hero_title_position, sort_order, is_active';
 
 const SALON_SLUGS = ['labo', 'nit', 'elu', 'olea'] as const;
 type SalonSlug = typeof SALON_SLUGS[number];
@@ -57,6 +57,7 @@ type LpSection = {
   media_type: 'image' | 'video' | null;
   media_aspect: 'video' | 'portrait' | 'square' | 'vertical';
   media_position: 'center' | 'top' | 'bottom' | 'left' | 'right';
+  hero_title_position: 'top' | 'center' | 'bottom';
   sort_order: number;
   is_active: boolean;
 };
@@ -66,6 +67,7 @@ type SectionForm = {
   body: string;
   media_aspect: 'video' | 'portrait' | 'square' | 'vertical';
   media_position: 'center' | 'top' | 'bottom' | 'left' | 'right';
+  hero_title_position: 'top' | 'center' | 'bottom';
   is_active: boolean;
 };
 
@@ -110,6 +112,7 @@ export default function AdminSalonLpPage() {
       media_type: (r.media_type ?? null) as 'image' | 'video' | null,
       media_aspect: (r.media_aspect ?? 'video') as LpSection['media_aspect'],
       media_position: (r.media_position ?? 'center') as LpSection['media_position'],
+      hero_title_position: (r.hero_title_position ?? 'center') as LpSection['hero_title_position'],
       sort_order: r.sort_order,
       is_active: r.is_active,
     })));
@@ -132,6 +135,7 @@ export default function AdminSalonLpPage() {
       body: sec.body,
       media_aspect: sec.media_aspect,
       media_position: sec.media_position,
+      hero_title_position: sec.hero_title_position,
       is_active: sec.is_active,
     });
   };
@@ -151,6 +155,7 @@ export default function AdminSalonLpPage() {
         body: form.body,
         media_aspect: form.media_aspect,
         media_position: form.media_position,
+        hero_title_position: form.hero_title_position,
         is_active: form.is_active,
       })
       .eq('id', sectionId);
@@ -430,6 +435,22 @@ export default function AdminSalonLpPage() {
                         ))}
                       </div>
                     </div>
+
+                    {/* 店舗名テキスト位置（hero のみ） */}
+                    {sec.section_type === 'hero' && (
+                      <div>
+                        <label className="block text-[10px] tracking-widest text-stone-500 mb-2">店舗名の表示位置</label>
+                        <select
+                          value={form.hero_title_position}
+                          onChange={e => setField('hero_title_position', e.target.value as SectionForm['hero_title_position'])}
+                          className="text-xs text-stone-700 border border-stone-200 px-3 py-1.5 focus:outline-none focus:border-stone-400"
+                        >
+                          <option value="top">上</option>
+                          <option value="center">中央</option>
+                          <option value="bottom">下</option>
+                        </select>
+                      </div>
+                    )}
 
                     {/* 表示位置 */}
                     <div>
