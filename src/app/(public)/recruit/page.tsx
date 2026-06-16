@@ -6,6 +6,8 @@ import SectionTitle from '@/components/ui/SectionTitle';
 import Button from '@/components/ui/Button';
 import Breadcrumb from '@/components/seo/Breadcrumb';
 import LazyAutoPlayVideo from '@/components/ui/LazyAutoPlayVideo';
+import RecruitHeroSlider from '@/components/sections/RecruitHeroSlider';
+import type { RecruitHeroSlide } from '@/components/sections/RecruitHeroSlider';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 export const metadata: Metadata = buildMetadata({
@@ -117,14 +119,16 @@ export default async function RecruitPage() {
   // null = フォールバック、[] = 取得成功0件
   let sections: SectionItem[] | null = null;
   let jobs: JobItem[] | null = null;
-  let heroMediaUrl: string | null = null;
-  let heroMediaType: string | null = null;
+  let heroActive = false;
+  let heroFallbackUrl: string | null = null;
+  let heroFallbackType: string | null = null;
   let heroTitlePosition: string = 'center';
   let heroTitleY: number = 50;
+  let heroSlides: RecruitHeroSlide[] = [];
 
   const supabase = await createSupabaseServerClient();
   if (supabase) {
-    const [secRes, jobRes, heroRes] = await Promise.all([
+    const [secRes, jobRes, heroRes, slidesRes] = await Promise.all([
       supabase
         .from('recruit_sections')
         .select('title, body, items, media_url, media_type, media_layout, media_aspect, media_position')
@@ -137,20 +141,40 @@ export default async function RecruitPage() {
         .order('sort_order', { ascending: true }),
       supabase
         .from('recruit_hero')
-        .select('media_url, media_type, hero_title_position, hero_title_y_percent')
-        .eq('is_active', true)
+        .select('media_url, media_type, is_active, hero_title_position, hero_title_y_percent')
         .limit(1)
         .maybeSingle(),
+      supabase
+        .from('recruit_hero_slides')
+        .select('media_url, media_type')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true }),
     ]);
     sections = secRes.error ? null : (secRes.data ?? []);
     jobs = jobRes.error ? null : (jobRes.data ?? []);
-    if (!heroRes.error && heroRes.data?.media_url) {
-      heroMediaUrl = heroRes.data.media_url;
-      heroMediaType = heroRes.data.media_type ?? null;
+    if (!heroRes.error && heroRes.data) {
+      heroActive = heroRes.data.is_active ?? false;
+      heroFallbackUrl = heroRes.data.media_url ?? null;
+      heroFallbackType = heroRes.data.media_type ?? null;
       heroTitlePosition = heroRes.data.hero_title_position ?? 'center';
       heroTitleY = heroRes.data.hero_title_y_percent ?? 50;
     }
+    if (!slidesRes.error && slidesRes.data) {
+      heroSlides = slidesRes.data.map((s) => ({
+        media_url: s.media_url as string,
+        media_type: s.media_type as string | null,
+      }));
+    }
   }
+
+  const effectiveSlides: RecruitHeroSlide[] = heroActive
+    ? heroSlides.length > 0
+      ? heroSlides
+      : heroFallbackUrl
+        ? [{ media_url: heroFallbackUrl, media_type: heroFallbackType }]
+        : []
+    : [];
+  const showHero = effectiveSlides.length > 0;
 
   const displaySections: SectionItem[] =
     sections === null
@@ -174,40 +198,12 @@ export default async function RecruitPage() {
   return (
     <>
       {/* ── HERO ── */}
-      {heroMediaUrl ? (
-        <div className="relative w-full aspect-video sm:h-[60vh] sm:aspect-auto overflow-hidden bg-stone-900 pt-14 sm:pt-16">
-          {heroMediaType === 'video' ? (
-            <LazyAutoPlayVideo
-              src={heroMediaUrl}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <Image
-              src={heroMediaUrl}
-              alt="採用情報"
-              fill
-              className="object-cover"
-              priority
-              unoptimized
-            />
-          )}
-          {/* グラデーションオーバーレイ */}
-          {heroTitlePosition === 'top' ? (
-            <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/10 to-transparent" />
-          ) : heroTitlePosition === 'bottom' ? (
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
-          ) : (
-            <div className="absolute inset-0 bg-black/35" />
-          )}
-          {/* テキスト */}
-          <div
-            className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 text-center px-6 w-full"
-            style={{ top: `${heroTitleY}%` }}
-          >
-            <p className="text-[10px] tracking-[0.3em] text-stone-300 uppercase mb-3">Join Us</p>
-            <h1 className="text-3xl sm:text-5xl font-light tracking-widest text-white">採用情報</h1>
-          </div>
-        </div>
+      {showHero ? (
+        <RecruitHeroSlider
+          slides={effectiveSlides}
+          titleY={heroTitleY}
+          titlePosition={heroTitlePosition}
+        />
       ) : (
         <div className="pt-20">
           <Breadcrumb items={[{ name: '採用情報', path: '/recruit' }]} />
@@ -215,14 +211,14 @@ export default async function RecruitPage() {
       )}
 
       {/* HEROがある場合のBreadcrumb */}
-      {heroMediaUrl && (
+      {showHero && (
         <div className="px-5 sm:px-8 py-3 max-w-screen-lg mx-auto">
           <Breadcrumb items={[{ name: '採用情報', path: '/recruit' }]} />
         </div>
       )}
 
       {/* ページヘッダー（HEROがない場合のみ表示） */}
-      {!heroMediaUrl && (
+      {!showHero && (
         <section className="py-16 sm:py-24 border-b border-stone-100">
           <Container>
             <SectionTitle

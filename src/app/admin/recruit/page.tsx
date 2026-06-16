@@ -1008,8 +1008,33 @@ export default function AdminRecruitPage() {
 
   useEffect(() => { loadHero(); }, [loadHero]);
 
-  const uploadHeroMedia = async (file: File) => {
-    if (!supabase || !heroMedia) return;
+  type HeroSlide = {
+    id: string;
+    media_url: string;
+    media_type: 'image' | 'video' | null;
+    sort_order: number;
+    is_active: boolean;
+  };
+
+  const [slides, setSlides] = useState<HeroSlide[]>([]);
+  const [loadingSlides, setLoadingSlides] = useState(true);
+
+  const loadSlides = useCallback(async () => {
+    if (!supabase) { setLoadingSlides(false); return; }
+    setLoadingSlides(true);
+    const { data, error } = await supabase
+      .from('recruit_hero_slides')
+      .select('id, media_url, media_type, sort_order, is_active')
+      .order('sort_order', { ascending: true });
+    if (error) { showMessage(`取得失敗: ${error.message}`); }
+    else { setSlides((data ?? []) as HeroSlide[]); }
+    setLoadingSlides(false);
+  }, [supabase]);
+
+  useEffect(() => { loadSlides(); }, [loadSlides]);
+
+  const uploadSlide = async (file: File) => {
+    if (!supabase) return;
     const isImage = IMAGE_TYPES.includes(file.type);
     const isVideo = MEDIA_VIDEO_TYPES.includes(file.type);
     if (!isImage && !isVideo) { showMessage('jpg / png / webp / gif / mp4 / mov / webm のみアップロードできます'); return; }
@@ -1018,42 +1043,53 @@ export default function AdminRecruitPage() {
     setUploadingHero(true);
     try {
       const ext = file.name.split('.').pop()?.toLowerCase() ?? 'mp4';
-      const path = `recruit/hero/${Date.now()}.${ext}`;
+      const path = `recruit/hero/slides/${Date.now()}.${ext}`;
       const { error: uploadErr } = await supabase.storage.from(BUCKET).upload(path, file);
       if (uploadErr) { showMessage(`アップロード失敗: ${uploadErr.message}`); return; }
       const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(path);
-      if (heroMedia.media_url) {
-        const oldPath = extractStoragePath(heroMedia.media_url);
-        if (oldPath) await supabase.storage.from(BUCKET).remove([oldPath]);
-      }
+      const maxSort = slides.length > 0 ? Math.max(...slides.map(s => s.sort_order)) + 1 : 0;
       const mediaType: 'image' | 'video' = isVideo ? 'video' : 'image';
       const { error: dbErr } = await supabase
-        .from('recruit_hero')
-        .update({ media_url: publicUrl, media_type: mediaType, is_active: true })
-        .eq('id', heroMedia.id);
+        .from('recruit_hero_slides')
+        .insert({ media_url: publicUrl, media_type: mediaType, sort_order: maxSort, is_active: true });
       if (dbErr) { showMessage(`DB保存失敗: ${dbErr.message}`); return; }
-      showMessage('HEROメディアをアップロードしました');
-      await loadHero();
+      showMessage('スライドを追加しました');
+      await loadSlides();
     } finally {
       setUploadingHero(false);
       if (heroFileRef.current) heroFileRef.current.value = '';
     }
   };
 
-  const deleteHeroMedia = async () => {
-    if (!supabase || !heroMedia) return;
-    if (!window.confirm('HEROメディアを削除しますか？')) return;
-    if (heroMedia.media_url) {
-      const oldPath = extractStoragePath(heroMedia.media_url);
-      if (oldPath) await supabase.storage.from(BUCKET).remove([oldPath]);
-    }
-    const { error } = await supabase
-      .from('recruit_hero')
-      .update({ media_url: null, media_type: null, is_active: false })
-      .eq('id', heroMedia.id);
+  const deleteSlide = async (slide: HeroSlide) => {
+    if (!supabase) return;
+    if (!window.confirm('このスライドを削除しますか？')) return;
+    const oldPath = extractStoragePath(slide.media_url);
+    if (oldPath) await supabase.storage.from(BUCKET).remove([oldPath]);
+    const { error } = await supabase.from('recruit_hero_slides').delete().eq('id', slide.id);
     if (error) { showMessage(`削除失敗: ${error.message}`); return; }
-    showMessage('HEROメディアを削除しました');
-    await loadHero();
+    showMessage('スライドを削除しました');
+    await loadSlides();
+  };
+
+  const toggleSlide = async (slide: HeroSlide) => {
+    if (!supabase) return;
+    await supabase.from('recruit_hero_slides').update({ is_active: !slide.is_active }).eq('id', slide.id);
+    await loadSlides();
+  };
+
+  const moveSlide = async (id: string, dir: 'up' | 'down') => {
+    if (!supabase) return;
+    const idx = slides.findIndex(s => s.id === id);
+    const targetIdx = dir === 'up' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= slides.length) return;
+    const a = slides[idx];
+    const b = slides[targetIdx];
+    await Promise.all([
+      supabase.from('recruit_hero_slides').update({ sort_order: b.sort_order }).eq('id', a.id),
+      supabase.from('recruit_hero_slides').update({ sort_order: a.sort_order }).eq('id', b.id),
+    ]);
+    await loadSlides();
   };
 
   const saveHeroActive = async (isActive: boolean) => {
@@ -1516,9 +1552,9 @@ export default function AdminRecruitPage() {
 
       {/* ========== HERO タブ ========== */}
       {activeTab === 'hero' && (
-        <div className="space-y-4">
+        <div className="space-y-6">
           <p className="text-xs text-stone-400">
-            採用ページ最上部に表示する HERO 動画・画像を管理します。未設定の場合は従来のヘッダー表示になります。
+            採用ページ最上部に表示する HERO スライドを管理します。スライドが1件以上あり公開設定がONの場合に表示されます。
           </p>
 
           {/* hidden file input */}
@@ -1530,137 +1566,167 @@ export default function AdminRecruitPage() {
             disabled={!isConfigured || uploadingHero}
             onChange={(e) => {
               const file = e.target.files?.[0];
-              if (file) uploadHeroMedia(file);
+              if (file) uploadSlide(file);
             }}
           />
 
+          {/* HERO全体設定 */}
           {loadingHero ? (
             <p className="text-xs text-stone-400">読み込み中...</p>
-          ) : (
+          ) : heroMedia && (
             <section className="bg-white border border-stone-200 rounded-lg">
+              <div className="px-5 py-4 border-b border-stone-100">
+                <p className="text-sm font-medium text-stone-800">HERO全体設定</p>
+              </div>
               <div className="px-5 py-5 space-y-5">
-                {/* プレビュー */}
-                {heroMedia?.media_url && (
-                  <div>
-                    <p className="text-[10px] tracking-widest text-stone-500 mb-2">現在のHEROメディア</p>
-                    <div className="w-full aspect-video bg-stone-100 rounded overflow-hidden relative mb-2">
-                      {heroMedia.media_type === 'video' ? (
-                        <video
-                          src={heroMedia.media_url}
-                          className="w-full h-full object-cover"
-                          muted
-                          playsInline
-                        />
-                      ) : (
-                        <img
-                          src={heroMedia.media_url}
-                          alt="HERO"
-                          className="w-full h-full object-cover"
-                        />
-                      )}
-                    </div>
-                    <p className="text-[10px] text-stone-400 truncate max-w-sm">{heroMedia.media_url}</p>
-                  </div>
-                )}
-
-                {/* アップロード */}
-                <div>
-                  <p className="text-[10px] tracking-widest text-stone-500 mb-2">メディアをアップロード</p>
-                  <button
-                    onClick={() => heroFileRef.current?.click()}
-                    disabled={!isConfigured || uploadingHero}
-                    className="text-[10px] py-1.5 px-3 border border-stone-300 text-stone-600 hover:bg-stone-50 rounded transition-colors disabled:opacity-40"
-                  >
-                    {uploadingHero ? 'アップロード中...' : heroMedia?.media_url ? 'メディアを差し替え' : 'メディアをアップロード'}
-                  </button>
-                  <p className="text-[10px] text-stone-400 mt-1">
-                    画像: jpg / png / webp / gif（5MB以下）　動画: mp4 / mov / webm（50MB以下）
-                  </p>
+                {/* 公開設定 */}
+                <div className="flex items-center gap-2">
+                  <input
+                    id="hero_is_active"
+                    type="checkbox"
+                    checked={heroMedia.is_active}
+                    onChange={(e) => saveHeroActive(e.target.checked)}
+                    disabled={!isConfigured || savingHero}
+                    className="rounded border-stone-300"
+                  />
+                  <label htmlFor="hero_is_active" className="text-xs text-stone-600">
+                    HEROを公開する（スライドが1件以上ある場合に表示されます）
+                  </label>
                 </div>
 
-                {/* 公開設定 */}
-                {heroMedia?.media_url && (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <input
-                        id="hero_is_active"
-                        type="checkbox"
-                        checked={heroMedia.is_active}
-                        onChange={(e) => saveHeroActive(e.target.checked)}
-                        disabled={!isConfigured || savingHero}
-                        className="rounded border-stone-300"
-                      />
-                      <label htmlFor="hero_is_active" className="text-xs text-stone-600">
-                        公開する（チェックを外すと採用ページ上部に表示されません）
-                      </label>
-                    </div>
-                    <button
-                      onClick={deleteHeroMedia}
-                      disabled={!isConfigured || uploadingHero}
-                      className="text-[10px] py-1 px-2 border border-red-300 text-red-500 hover:bg-red-50 rounded transition-colors disabled:opacity-40"
-                    >
-                      HEROメディアを削除
-                    </button>
-                  </div>
-                )}
-
                 {/* 文字位置調整 */}
-                {heroMedia?.media_url && (
-                  <div>
-                    <p className="text-[10px] tracking-widest text-stone-500 mb-3">文字の縦位置</p>
-                    {/* 目安ボタン */}
-                    <div className="flex gap-2 mb-3">
-                      {([
-                        { label: '上', y: 22, pos: 'top' },
-                        { label: '中央', y: 50, pos: 'center' },
-                        { label: '下', y: 78, pos: 'bottom' },
-                      ] as const).map(({ label, y, pos }) => (
-                        <button
-                          key={pos}
-                          type="button"
-                          onClick={() => saveHeroTitlePosition(y, pos)}
-                          disabled={savingHero}
-                          className={`text-xs px-3 py-1 border transition-colors disabled:opacity-40 ${heroMedia.hero_title_position === pos ? 'bg-stone-800 text-white border-stone-800' : 'text-stone-600 border-stone-300 hover:border-stone-500'}`}
-                        >
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                    {/* スライダー */}
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="range"
-                        min={10}
-                        max={90}
-                        value={heroMedia.hero_title_y_percent}
-                        onChange={e => {
-                          const y = Number(e.target.value);
-                          const pos: 'top' | 'center' | 'bottom' =
-                            y <= 33 ? 'top' : y <= 66 ? 'center' : 'bottom';
-                          setHeroMedia(prev => prev ? { ...prev, hero_title_y_percent: y, hero_title_position: pos } : prev);
-                        }}
-                        onMouseUp={e => {
-                          const y = Number((e.target as HTMLInputElement).value);
-                          const pos: 'top' | 'center' | 'bottom' =
-                            y <= 33 ? 'top' : y <= 66 ? 'center' : 'bottom';
-                          saveHeroTitlePosition(y, pos);
-                        }}
-                        onTouchEnd={e => {
-                          const y = Number((e.target as HTMLInputElement).value);
-                          const pos: 'top' | 'center' | 'bottom' =
-                            y <= 33 ? 'top' : y <= 66 ? 'center' : 'bottom';
-                          saveHeroTitlePosition(y, pos);
-                        }}
-                        className="flex-1 accent-stone-600"
-                      />
-                      <span className="text-xs text-stone-500 w-14 shrink-0">現在位置 {heroMedia.hero_title_y_percent}%</span>
-                    </div>
-                    <p className="text-[10px] text-stone-400 mt-1">スライダーを離したタイミングで自動保存されます</p>
+                <div>
+                  <p className="text-[10px] tracking-widest text-stone-500 mb-3">文字の縦位置</p>
+                  <div className="flex gap-2 mb-3">
+                    {([
+                      { label: '上', y: 22, pos: 'top' },
+                      { label: '中央', y: 50, pos: 'center' },
+                      { label: '下', y: 78, pos: 'bottom' },
+                    ] as const).map(({ label, y, pos }) => (
+                      <button
+                        key={pos}
+                        type="button"
+                        onClick={() => saveHeroTitlePosition(y, pos)}
+                        disabled={savingHero}
+                        className={`text-xs px-3 py-1 border transition-colors disabled:opacity-40 ${heroMedia.hero_title_position === pos ? 'bg-stone-800 text-white border-stone-800' : 'text-stone-600 border-stone-300 hover:border-stone-500'}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
                   </div>
-                )}
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range"
+                      min={10}
+                      max={90}
+                      value={heroMedia.hero_title_y_percent}
+                      onChange={e => {
+                        const y = Number(e.target.value);
+                        const pos: 'top' | 'center' | 'bottom' =
+                          y <= 33 ? 'top' : y <= 66 ? 'center' : 'bottom';
+                        setHeroMedia(prev => prev ? { ...prev, hero_title_y_percent: y, hero_title_position: pos } : prev);
+                      }}
+                      onMouseUp={e => {
+                        const y = Number((e.target as HTMLInputElement).value);
+                        const pos: 'top' | 'center' | 'bottom' =
+                          y <= 33 ? 'top' : y <= 66 ? 'center' : 'bottom';
+                        saveHeroTitlePosition(y, pos);
+                      }}
+                      onTouchEnd={e => {
+                        const y = Number((e.target as HTMLInputElement).value);
+                        const pos: 'top' | 'center' | 'bottom' =
+                          y <= 33 ? 'top' : y <= 66 ? 'center' : 'bottom';
+                        saveHeroTitlePosition(y, pos);
+                      }}
+                      className="flex-1 accent-stone-600"
+                    />
+                    <span className="text-xs text-stone-500 w-14 shrink-0">現在位置 {heroMedia.hero_title_y_percent}%</span>
+                  </div>
+                  <p className="text-[10px] text-stone-400 mt-1">スライダーを離したタイミングで自動保存されます</p>
+                </div>
               </div>
             </section>
           )}
+
+          {/* スライド管理 */}
+          <section className="bg-white border border-stone-200 rounded-lg">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100">
+              <p className="text-sm font-medium text-stone-800">スライド管理</p>
+              <button
+                onClick={() => heroFileRef.current?.click()}
+                disabled={!isConfigured || uploadingHero}
+                className="text-xs tracking-wider text-stone-600 border border-stone-400 px-3 py-1.5 hover:bg-stone-50 rounded transition-colors disabled:opacity-40"
+              >
+                {uploadingHero ? 'アップロード中...' : '+ スライドを追加'}
+              </button>
+            </div>
+            <div className="px-5 py-5">
+              <p className="text-[10px] text-stone-400 mb-4">
+                画像: jpg / png / webp / gif（5MB以下）　動画: mp4 / mov / webm（50MB以下）
+              </p>
+              {loadingSlides ? (
+                <p className="text-xs text-stone-400">読み込み中...</p>
+              ) : slides.length === 0 ? (
+                <p className="text-xs text-stone-400">スライドがありません。「+ スライドを追加」でアップロードしてください。</p>
+              ) : (
+                <div className="space-y-3">
+                  {slides.map((slide, i) => (
+                    <div key={slide.id} className="flex items-center gap-3 border border-stone-100 rounded p-3">
+                      {/* プレビュー */}
+                      <div className="w-20 shrink-0 aspect-video bg-stone-100 overflow-hidden relative rounded">
+                        {slide.media_type === 'video' ? (
+                          <video
+                            src={slide.media_url}
+                            className="w-full h-full object-cover"
+                            muted
+                            playsInline
+                          />
+                        ) : (
+                          <img
+                            src={slide.media_url}
+                            alt=""
+                            className="w-full h-full object-cover"
+                          />
+                        )}
+                      </div>
+                      {/* 情報 */}
+                      <div className="flex-1 min-w-0">
+                        <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium text-white ${slide.is_active ? 'bg-green-500' : 'bg-stone-400'}`}>
+                          {slide.is_active ? '公開' : '非表示'}
+                        </span>
+                        <p className="text-[10px] text-stone-400 mt-1">{slide.media_type} · sort: {slide.sort_order}</p>
+                      </div>
+                      {/* 操作 */}
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={() => moveSlide(slide.id, 'up')}
+                          disabled={!isConfigured || i === 0}
+                          className="text-[10px] px-2 py-1 border border-stone-300 text-stone-500 hover:bg-stone-50 rounded transition-colors disabled:opacity-30"
+                        >↑</button>
+                        <button
+                          onClick={() => moveSlide(slide.id, 'down')}
+                          disabled={!isConfigured || i === slides.length - 1}
+                          className="text-[10px] px-2 py-1 border border-stone-300 text-stone-500 hover:bg-stone-50 rounded transition-colors disabled:opacity-30"
+                        >↓</button>
+                        <button
+                          onClick={() => toggleSlide(slide)}
+                          disabled={!isConfigured}
+                          className={`text-[10px] px-2 py-1 border rounded transition-colors disabled:opacity-40 ${slide.is_active ? 'border-green-400 text-green-600 hover:bg-green-50' : 'border-stone-300 text-stone-400 hover:bg-stone-50'}`}
+                        >
+                          {slide.is_active ? '公開中' : '非表示'}
+                        </button>
+                        <button
+                          onClick={() => deleteSlide(slide)}
+                          disabled={!isConfigured}
+                          className="text-[10px] px-2 py-1 border border-red-300 text-red-500 hover:bg-red-50 rounded transition-colors disabled:opacity-40"
+                        >削除</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
         </div>
       )}
 
