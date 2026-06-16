@@ -47,6 +47,15 @@ function getPositionClass(position: string): string {
   return 'object-center';
 }
 
+type HeroSlide = {
+  id: string;
+  salon_slug: string;
+  media_url: string;
+  media_type: 'image' | 'video' | null;
+  sort_order: number;
+  is_active: boolean;
+};
+
 type LpSection = {
   id: string;
   salon_slug: string;
@@ -89,6 +98,11 @@ export default function AdminSalonLpPage() {
   const mediaFileRef = useRef<HTMLInputElement>(null);
   const pendingSection = useRef<LpSection | null>(null);
 
+  const [heroSlides, setHeroSlides] = useState<HeroSlide[]>([]);
+  const [loadingSlides, setLoadingSlides] = useState(false);
+  const [uploadingSlide, setUploadingSlide] = useState(false);
+  const heroSlideFileRef = useRef<HTMLInputElement>(null);
+
   const showMessage = (msg: string) => {
     setMessage(msg);
     setTimeout(() => setMessage(''), 4000);
@@ -121,11 +135,32 @@ export default function AdminSalonLpPage() {
     })));
   }, [supabase]);
 
+  const loadSlides = useCallback(async (slug: string) => {
+    if (!supabase) return;
+    setLoadingSlides(true);
+    const { data, error } = await supabase
+      .from('salon_hero_slides')
+      .select('id, salon_slug, media_url, media_type, sort_order, is_active')
+      .eq('salon_slug', slug)
+      .order('sort_order', { ascending: true });
+    setLoadingSlides(false);
+    if (error) { showMessage(`スライド読み込み失敗: ${error.message}`); return; }
+    setHeroSlides((data ?? []).map(r => ({
+      id: r.id,
+      salon_slug: r.salon_slug,
+      media_url: r.media_url,
+      media_type: (r.media_type ?? null) as 'image' | 'video' | null,
+      sort_order: r.sort_order,
+      is_active: r.is_active,
+    })));
+  }, [supabase]);
+
   useEffect(() => {
     setEditingId(null);
     setForm(null);
     loadSections(selectedSlug);
-  }, [loadSections, selectedSlug]);
+    loadSlides(selectedSlug);
+  }, [loadSections, loadSlides, selectedSlug]);
 
   const setField = <K extends keyof SectionForm>(key: K, value: SectionForm[K]) => {
     setForm(prev => prev ? { ...prev, [key]: value } : prev);
@@ -244,6 +279,78 @@ export default function AdminSalonLpPage() {
     await loadSections(selectedSlug);
   };
 
+  const uploadSlide = async (file: File) => {
+    if (!supabase) return;
+    const isImage = IMAGE_TYPES.includes(file.type);
+    const isVideo = VIDEO_TYPES.includes(file.type);
+    if (!isImage && !isVideo) {
+      showMessage('jpg / png / webp / gif / mp4 / mov / webm のみアップロードできます');
+      return;
+    }
+    if (isImage && file.size > IMAGE_MAX_SIZE) { showMessage('画像のサイズは 5MB 以下にしてください'); return; }
+    if (isVideo && file.size > VIDEO_MAX_SIZE) { showMessage('動画のサイズは 50MB 以下にしてください'); return; }
+
+    setUploadingSlide(true);
+    try {
+      const ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg';
+      const path = `salons/${selectedSlug}/hero/slides/${Date.now()}.${ext}`;
+      const { error: uploadErr } = await supabase.storage.from(BUCKET).upload(path, file);
+      if (uploadErr) { showMessage(`アップロード失敗: ${uploadErr.message}`); return; }
+
+      const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(path);
+      const mediaType: 'image' | 'video' = isVideo ? 'video' : 'image';
+      const nextOrder = heroSlides.length > 0
+        ? Math.max(...heroSlides.map(s => s.sort_order)) + 1
+        : 0;
+
+      const { error: dbErr } = await supabase
+        .from('salon_hero_slides')
+        .insert({ salon_slug: selectedSlug, media_url: publicUrl, media_type: mediaType, sort_order: nextOrder });
+      if (dbErr) { showMessage(`DB保存失敗: ${dbErr.message}`); return; }
+
+      showMessage('スライドを追加しました');
+      await loadSlides(selectedSlug);
+    } finally {
+      setUploadingSlide(false);
+      if (heroSlideFileRef.current) heroSlideFileRef.current.value = '';
+    }
+  };
+
+  const deleteSlide = async (slide: HeroSlide) => {
+    if (!supabase) return;
+    if (!window.confirm('このスライドを削除しますか？')) return;
+    const oldPath = extractStoragePath(slide.media_url);
+    if (oldPath) await supabase.storage.from(BUCKET).remove([oldPath]);
+    const { error } = await supabase.from('salon_hero_slides').delete().eq('id', slide.id);
+    if (error) { showMessage(`削除失敗: ${error.message}`); return; }
+    showMessage('スライドを削除しました');
+    await loadSlides(selectedSlug);
+  };
+
+  const toggleSlide = async (slide: HeroSlide) => {
+    if (!supabase) return;
+    const { error } = await supabase
+      .from('salon_hero_slides')
+      .update({ is_active: !slide.is_active })
+      .eq('id', slide.id);
+    if (error) { showMessage(`更新失敗: ${error.message}`); return; }
+    await loadSlides(selectedSlug);
+  };
+
+  const moveSlide = async (slideId: string, dir: 'up' | 'down') => {
+    if (!supabase) return;
+    const idx = heroSlides.findIndex(s => s.id === slideId);
+    const targetIdx = dir === 'up' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= heroSlides.length) return;
+    const a = heroSlides[idx];
+    const b = heroSlides[targetIdx];
+    await Promise.all([
+      supabase.from('salon_hero_slides').update({ sort_order: b.sort_order }).eq('id', a.id),
+      supabase.from('salon_hero_slides').update({ sort_order: a.sort_order }).eq('id', b.id),
+    ]);
+    await loadSlides(selectedSlug);
+  };
+
   if (!isConfigured) {
     return <div className="text-xs text-stone-400 tracking-wider">Supabase が設定されていません</div>;
   }
@@ -276,7 +383,7 @@ export default function AdminSalonLpPage() {
         ))}
       </div>
 
-      {/* hidden file input */}
+      {/* hidden file input（LPセクションメディア用） */}
       <input
         ref={mediaFileRef}
         type="file"
@@ -285,6 +392,17 @@ export default function AdminSalonLpPage() {
         onChange={e => {
           const file = e.target.files?.[0];
           if (file && pendingSection.current) uploadMedia(file, pendingSection.current);
+        }}
+      />
+      {/* hidden file input（HEROスライド用） */}
+      <input
+        ref={heroSlideFileRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/webm"
+        className="hidden"
+        onChange={e => {
+          const file = e.target.files?.[0];
+          if (file) uploadSlide(file);
         }}
       />
 
@@ -444,7 +562,7 @@ export default function AdminSalonLpPage() {
                     {/* 店舗名テキスト位置（hero のみ） */}
                     {sec.section_type === 'hero' && (
                       <div>
-                        <label className="block text-[10px] tracking-widest text-stone-500 mb-2">店舗名の縦位置</label>
+                        <label className="block text-[10px] tracking-widest text-stone-500 mb-2">店舗名の縦位置（全スライド共通）</label>
                         {/* 目安ボタン */}
                         <div className="flex gap-2 mb-3">
                           {([
@@ -483,6 +601,74 @@ export default function AdminSalonLpPage() {
                           />
                           <span className="text-xs text-stone-500 w-14 shrink-0">現在位置 {form.hero_title_y_percent}%</span>
                         </div>
+                      </div>
+                    )}
+
+                    {/* HEROスライド管理（hero のみ） */}
+                    {sec.section_type === 'hero' && (
+                      <div className="border-t border-stone-200 pt-5">
+                        <p className="text-[10px] tracking-widest text-stone-500 mb-1">HEROスライド管理</p>
+                        <p className="text-[10px] text-stone-400 mb-3">スライドが0件の場合は上記「画像 / 動画」がフォールバックとして表示されます</p>
+                        {loadingSlides ? (
+                          <p className="text-xs text-stone-400">読み込み中...</p>
+                        ) : (
+                          <div className="space-y-2 mb-3">
+                            {heroSlides.map((slide, si) => (
+                              <div key={slide.id} className="flex items-center gap-3 border border-stone-200 p-2 bg-white">
+                                {/* サムネイル */}
+                                <div className="w-16 h-10 bg-stone-100 overflow-hidden relative shrink-0">
+                                  {slide.media_type === 'video' ? (
+                                    <video
+                                      src={slide.media_url}
+                                      className="absolute inset-0 w-full h-full object-cover"
+                                      muted
+                                      playsInline
+                                    />
+                                  ) : (
+                                    <img
+                                      src={slide.media_url}
+                                      alt={`スライド ${si + 1}`}
+                                      className="absolute inset-0 w-full h-full object-cover"
+                                    />
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-[10px] text-stone-400 truncate">{slide.media_type === 'video' ? '動画' : '画像'} #{si + 1}</p>
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <button type="button" onClick={() => moveSlide(slide.id, 'up')} disabled={si === 0} className="text-xs text-stone-400 hover:text-stone-700 disabled:opacity-20 px-1">↑</button>
+                                  <button type="button" onClick={() => moveSlide(slide.id, 'down')} disabled={si === heroSlides.length - 1} className="text-xs text-stone-400 hover:text-stone-700 disabled:opacity-20 px-1">↓</button>
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleSlide(slide)}
+                                    className={`text-[10px] px-2 py-0.5 border transition-colors ${slide.is_active ? 'bg-stone-800 text-white border-stone-800' : 'text-stone-500 border-stone-300 hover:border-stone-500'}`}
+                                  >
+                                    {slide.is_active ? '公開' : '非表示'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => deleteSlide(slide)}
+                                    className="text-[10px] text-red-400 border border-red-200 px-2 py-0.5 hover:border-red-400 transition-colors"
+                                  >
+                                    削除
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                            {heroSlides.length === 0 && (
+                              <p className="text-xs text-stone-400">スライドはまだありません</p>
+                            )}
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => heroSlideFileRef.current?.click()}
+                          disabled={uploadingSlide}
+                          className="text-xs tracking-wider text-stone-600 border border-stone-300 px-4 py-1.5 hover:border-stone-500 transition-colors disabled:opacity-40"
+                        >
+                          {uploadingSlide ? 'アップロード中...' : '+ スライドを追加'}
+                        </button>
+                        <p className="text-[10px] text-stone-400 mt-1">画像: jpg/png/webp/gif（5MB以下）　動画: mp4/mov/webm（50MB以下）</p>
                       </div>
                     )}
 

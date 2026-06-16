@@ -9,6 +9,8 @@ import { getSalonBySlug, SALONS, type Salon } from '@/constants/salons';
 import { getStaffBySalon, type StaffMember } from '@/constants/staff';
 import StaffCard from '@/components/cards/StaffCard';
 import LazyAutoPlayVideo from '@/components/ui/LazyAutoPlayVideo';
+import SalonHeroSlider from '@/components/sections/SalonHeroSlider';
+import type { SalonHeroSlide } from '@/components/sections/SalonHeroSlider';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 type SalonDetailProps = {
@@ -71,10 +73,11 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
   let salonMenus: SalonMenu[] = [];
   let staff: StaffMember[] = getStaffBySalon(slug);
   let lpSections: LpSection[] = [];
+  let heroSlides: SalonHeroSlide[] = [];
 
   const supabase = await createSupabaseServerClient();
   if (supabase) {
-    const [salonRes, menusRes, staffRes, lpRes] = await Promise.all([
+    const [salonRes, menusRes, staffRes, lpRes, slidesRes] = await Promise.all([
       supabase
         .from('salons')
         .select('slug, name, short_name, description, address, address_postal, address_locality, tel, hours, hours_note, nearest_station, latitude, longitude, google_map_url, hotpepper_url, instagram_url, line_url, image_url')
@@ -95,6 +98,12 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
       supabase
         .from('salon_lp_sections')
         .select('id, section_type, title, body, media_url, media_type, media_aspect, media_position, hero_title_position, hero_title_y_percent, sort_order')
+        .eq('salon_slug', slug)
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true }),
+      supabase
+        .from('salon_hero_slides')
+        .select('media_url, media_type')
         .eq('salon_slug', slug)
         .eq('is_active', true)
         .order('sort_order', { ascending: true }),
@@ -152,6 +161,13 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
     if (!lpRes.error && lpRes.data) {
       lpSections = lpRes.data as LpSection[];
     }
+
+    if (!slidesRes.error && slidesRes.data) {
+      heroSlides = slidesRes.data.map((s) => ({
+        media_url: s.media_url as string,
+        media_type: s.media_type as string | null,
+      }));
+    }
   }
 
   if (!salon && constSalon) salon = constSalon;
@@ -160,48 +176,27 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
   const heroSection = lpSections.find(s => s.section_type === 'hero');
   const nonHeroSections = lpSections.filter(s => s.section_type !== 'hero');
 
+  const effectiveSlides: SalonHeroSlide[] =
+    heroSlides.length > 0
+      ? heroSlides
+      : heroSection?.media_url
+        ? [{ media_url: heroSection.media_url, media_type: heroSection.media_type ?? null }]
+        : [];
+  const showHero = effectiveSlides.length > 0;
+
   return (
     <>
       <JsonLd data={buildSalonSchema(salon)} />
 
       {/* ── ヒーロー ── */}
-      {heroSection?.media_url ? (
-        <div className="relative w-full aspect-video sm:h-[70vh] sm:aspect-auto overflow-hidden bg-stone-900">
-          {heroSection.media_type === 'video' ? (
-            <LazyAutoPlayVideo
-              src={heroSection.media_url}
-              className={`w-full h-full object-cover ${getPositionClass(heroSection.media_position)}`}
-            />
-          ) : (
-            <Image
-              src={heroSection.media_url}
-              alt={salon.name}
-              fill
-              className={`object-cover ${getPositionClass(heroSection.media_position)}`}
-              unoptimized
-            />
-          )}
-          {/* グラデーションオーバーレイ */}
-          {heroSection.hero_title_position === 'top' ? (
-            <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/10 to-transparent" />
-          ) : heroSection.hero_title_position === 'bottom' ? (
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
-          ) : (
-            <div className="absolute inset-0 bg-black/35" />
-          )}
-          {/* 店舗名テキスト */}
-          <div
-            className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 text-center px-6 w-full"
-            style={{ top: `${heroSection.hero_title_y_percent ?? 50}%` }}
-          >
-            <p className="text-[10px] tracking-[0.3em] text-stone-300 uppercase mb-3">
-              {salon.shortName}
-            </p>
-            <h1 className="text-3xl sm:text-5xl font-light tracking-widest text-white">
-              {salon.name}
-            </h1>
-          </div>
-        </div>
+      {showHero ? (
+        <SalonHeroSlider
+          slides={effectiveSlides}
+          salonName={salon.name}
+          salonShortName={salon.shortName}
+          titleY={heroSection?.hero_title_y_percent ?? 50}
+          titlePosition={heroSection?.hero_title_position ?? 'center'}
+        />
       ) : (
         <div className="pt-20">
           <Breadcrumb
@@ -216,7 +211,7 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
       {/* ── イントロ + CTA ── */}
       <section className="py-12 sm:py-16 bg-white">
         <Container narrow>
-          {heroSection?.media_url && (
+          {showHero && (
             <div className="mb-6">
               <Breadcrumb
                 items={[
@@ -226,7 +221,7 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
               />
             </div>
           )}
-          {!heroSection?.media_url && (
+          {!showHero && (
             <>
               <p className="text-xs tracking-[0.3em] text-[#C9A96E] mb-3 uppercase">
                 {salon.shortName}
