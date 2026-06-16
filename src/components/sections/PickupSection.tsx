@@ -2,7 +2,11 @@ import Image from 'next/image';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import Container from '@/components/ui/Container';
 
-type Pickup = {
+type Props = {
+  salonSlug: string;
+};
+
+type SalonPickup = {
   image_url: string | null;
   alt: string | null;
   label: string | null;
@@ -10,19 +14,20 @@ type Pickup = {
   media_type: 'image' | 'video';
 };
 
-export default async function PickupSection() {
+export default async function PickupSection({ salonSlug }: Props) {
   const supabase = await createSupabaseServerClient();
   if (!supabase) return null;
 
   const { data, error } = await supabase
-    .from('pickups')
+    .from('salon_pickups')
     .select('image_url, alt, label, link_href, media_type')
+    .eq('salon_slug', salonSlug)
     .eq('is_active', true)
     .order('sort_order', { ascending: true });
 
   if (error || !data || data.length === 0) return null;
 
-  const pickups = data as Pickup[];
+  const pickups = data as SalonPickup[];
 
   return (
     <section className="py-16 sm:py-20 border-t border-stone-100">

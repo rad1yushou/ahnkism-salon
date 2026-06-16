@@ -273,7 +273,7 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
       </section>
 
       {/* ── Pick Up ── */}
-      <PickupSection />
+      <PickupSection salonSlug={slug} />
 
       {/* ── LP セクション ── */}
       {nonHeroSections.map((sec, i) => {

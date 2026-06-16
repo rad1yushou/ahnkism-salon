@@ -47,6 +47,24 @@ function getPositionClass(position: string): string {
   return 'object-center';
 }
 
+type SalonPickup = {
+  id: string;
+  salon_slug: string;
+  image_url: string | null;
+  alt: string | null;
+  label: string | null;
+  link_href: string | null;
+  media_type: 'image' | 'video';
+  sort_order: number;
+  is_active: boolean;
+};
+
+type PickupMeta = {
+  label: string;
+  alt: string;
+  link_href: string;
+};
+
 type HeroSlide = {
   id: string;
   salon_slug: string;
@@ -103,6 +121,13 @@ export default function AdminSalonLpPage() {
   const [uploadingSlide, setUploadingSlide] = useState(false);
   const heroSlideFileRef = useRef<HTMLInputElement>(null);
 
+  const [salonPickups, setSalonPickups] = useState<SalonPickup[]>([]);
+  const [loadingPickups, setLoadingPickups] = useState(false);
+  const [uploadingPickup, setUploadingPickup] = useState(false);
+  const [editingPickupId, setEditingPickupId] = useState<string | null>(null);
+  const [pickupMeta, setPickupMeta] = useState<PickupMeta>({ label: '', alt: '', link_href: '' });
+  const salonPickupFileRef = useRef<HTMLInputElement>(null);
+
   const showMessage = (msg: string) => {
     setMessage(msg);
     setTimeout(() => setMessage(''), 4000);
@@ -155,12 +180,37 @@ export default function AdminSalonLpPage() {
     })));
   }, [supabase]);
 
+  const loadPickups = useCallback(async (slug: string) => {
+    if (!supabase) return;
+    setLoadingPickups(true);
+    const { data, error } = await supabase
+      .from('salon_pickups')
+      .select('id, salon_slug, image_url, alt, label, link_href, media_type, sort_order, is_active')
+      .eq('salon_slug', slug)
+      .order('sort_order', { ascending: true });
+    setLoadingPickups(false);
+    if (error) { showMessage(`ピックアップ読み込み失敗: ${error.message}`); return; }
+    setSalonPickups((data ?? []).map(r => ({
+      id: r.id,
+      salon_slug: r.salon_slug,
+      image_url: r.image_url ?? null,
+      alt: r.alt ?? null,
+      label: r.label ?? null,
+      link_href: r.link_href ?? null,
+      media_type: (r.media_type ?? 'image') as 'image' | 'video',
+      sort_order: r.sort_order,
+      is_active: r.is_active,
+    })));
+  }, [supabase]);
+
   useEffect(() => {
     setEditingId(null);
     setForm(null);
+    setEditingPickupId(null);
     loadSections(selectedSlug);
     loadSlides(selectedSlug);
-  }, [loadSections, loadSlides, selectedSlug]);
+    loadPickups(selectedSlug);
+  }, [loadSections, loadSlides, loadPickups, selectedSlug]);
 
   const setField = <K extends keyof SectionForm>(key: K, value: SectionForm[K]) => {
     setForm(prev => prev ? { ...prev, [key]: value } : prev);
@@ -351,6 +401,97 @@ export default function AdminSalonLpPage() {
     await loadSlides(selectedSlug);
   };
 
+  const uploadPickup = async (file: File) => {
+    if (!supabase) return;
+    const isImage = IMAGE_TYPES.includes(file.type);
+    const isVideo = VIDEO_TYPES.includes(file.type);
+    if (!isImage && !isVideo) {
+      showMessage('jpg / png / webp / gif / mp4 / mov / webm のみアップロードできます');
+      return;
+    }
+    if (isImage && file.size > IMAGE_MAX_SIZE) { showMessage('画像のサイズは 5MB 以下にしてください'); return; }
+    if (isVideo && file.size > VIDEO_MAX_SIZE) { showMessage('動画のサイズは 50MB 以下にしてください'); return; }
+
+    setUploadingPickup(true);
+    try {
+      const ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg';
+      const path = `salons/${selectedSlug}/pickups/${Date.now()}.${ext}`;
+      const { error: uploadErr } = await supabase.storage.from(BUCKET).upload(path, file);
+      if (uploadErr) { showMessage(`アップロード失敗: ${uploadErr.message}`); return; }
+
+      const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(path);
+      const mediaType: 'image' | 'video' = isVideo ? 'video' : 'image';
+      const nextOrder = salonPickups.length > 0
+        ? Math.max(...salonPickups.map(p => p.sort_order)) + 1
+        : 0;
+
+      const { error: dbErr } = await supabase
+        .from('salon_pickups')
+        .insert({ salon_slug: selectedSlug, image_url: publicUrl, media_type: mediaType, sort_order: nextOrder });
+      if (dbErr) { showMessage(`DB保存失敗: ${dbErr.message}`); return; }
+
+      showMessage('ピックアップを追加しました');
+      await loadPickups(selectedSlug);
+    } finally {
+      setUploadingPickup(false);
+      if (salonPickupFileRef.current) salonPickupFileRef.current.value = '';
+    }
+  };
+
+  const deletePickup = async (pickup: SalonPickup) => {
+    if (!supabase) return;
+    if (!window.confirm('このピックアップを削除しますか？')) return;
+    if (pickup.image_url) {
+      const oldPath = extractStoragePath(pickup.image_url);
+      if (oldPath) await supabase.storage.from(BUCKET).remove([oldPath]);
+    }
+    const { error } = await supabase.from('salon_pickups').delete().eq('id', pickup.id);
+    if (error) { showMessage(`削除失敗: ${error.message}`); return; }
+    showMessage('ピックアップを削除しました');
+    if (editingPickupId === pickup.id) setEditingPickupId(null);
+    await loadPickups(selectedSlug);
+  };
+
+  const togglePickup = async (pickup: SalonPickup) => {
+    if (!supabase) return;
+    const { error } = await supabase
+      .from('salon_pickups')
+      .update({ is_active: !pickup.is_active })
+      .eq('id', pickup.id);
+    if (error) { showMessage(`更新失敗: ${error.message}`); return; }
+    await loadPickups(selectedSlug);
+  };
+
+  const movePickup = async (pickupId: string, dir: 'up' | 'down') => {
+    if (!supabase) return;
+    const idx = salonPickups.findIndex(p => p.id === pickupId);
+    const targetIdx = dir === 'up' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= salonPickups.length) return;
+    const a = salonPickups[idx];
+    const b = salonPickups[targetIdx];
+    await Promise.all([
+      supabase.from('salon_pickups').update({ sort_order: b.sort_order }).eq('id', a.id),
+      supabase.from('salon_pickups').update({ sort_order: a.sort_order }).eq('id', b.id),
+    ]);
+    await loadPickups(selectedSlug);
+  };
+
+  const savePickupMeta = async (pickup: SalonPickup) => {
+    if (!supabase) return;
+    const { error } = await supabase
+      .from('salon_pickups')
+      .update({
+        label: pickupMeta.label || null,
+        alt: pickupMeta.alt || null,
+        link_href: pickupMeta.link_href || null,
+      })
+      .eq('id', pickup.id);
+    if (error) { showMessage(`保存失敗: ${error.message}`); return; }
+    showMessage('保存しました');
+    setEditingPickupId(null);
+    await loadPickups(selectedSlug);
+  };
+
   if (!isConfigured) {
     return <div className="text-xs text-stone-400 tracking-wider">Supabase が設定されていません</div>;
   }
@@ -403,6 +544,17 @@ export default function AdminSalonLpPage() {
         onChange={e => {
           const file = e.target.files?.[0];
           if (file) uploadSlide(file);
+        }}
+      />
+      {/* hidden file input（店舗PickUp用） */}
+      <input
+        ref={salonPickupFileRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/webm"
+        className="hidden"
+        onChange={e => {
+          const file = e.target.files?.[0];
+          if (file) uploadPickup(file);
         }}
       />
 
@@ -713,6 +865,163 @@ export default function AdminSalonLpPage() {
           })}
         </div>
       )}
+      {/* ── 店舗ピックアップ管理 ── */}
+      <div className="mt-10">
+        <div className="mb-4">
+          <p className="text-[10px] tracking-[0.3em] text-[#C9A96E] uppercase mb-1">Pick Up</p>
+          <h2 className="text-base font-light tracking-wider text-stone-800">店舗ピックアップ管理</h2>
+          <p className="text-xs text-stone-400 mt-0.5">店舗ページに表示するピックアップ画像・動画を管理します</p>
+        </div>
+
+        {loadingPickups ? (
+          <p className="text-xs text-stone-400">読み込み中...</p>
+        ) : (
+          <div className="space-y-2 mb-4">
+            {salonPickups.length === 0 && (
+              <p className="text-xs text-stone-400">ピックアップはまだありません</p>
+            )}
+            {salonPickups.map((pickup, pi) => {
+              const isEditingThis = editingPickupId === pickup.id;
+              return (
+                <div key={pickup.id} className="border border-stone-200 bg-white">
+                  {/* 行ヘッダー */}
+                  <div className="flex items-center gap-3 px-3 py-2">
+                    {/* サムネイル */}
+                    <div className="w-14 h-10 bg-stone-100 overflow-hidden relative shrink-0">
+                      {pickup.image_url ? (
+                        pickup.media_type === 'video' ? (
+                          <video
+                            src={pickup.image_url}
+                            className="absolute inset-0 w-full h-full object-cover"
+                            muted
+                            playsInline
+                          />
+                        ) : (
+                          <img
+                            src={pickup.image_url}
+                            alt={pickup.alt ?? ''}
+                            className="absolute inset-0 w-full h-full object-cover"
+                          />
+                        )
+                      ) : (
+                        <div className="flex items-center justify-center h-full">
+                          <span className="text-[9px] text-stone-400">NO IMG</span>
+                        </div>
+                      )}
+                    </div>
+                    {/* ラベル */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-stone-700 truncate">{pickup.label ?? '（ラベルなし）'}</p>
+                      {pickup.link_href && (
+                        <p className="text-[10px] text-stone-400 truncate">{pickup.link_href}</p>
+                      )}
+                    </div>
+                    {/* 操作ボタン */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button type="button" onClick={() => movePickup(pickup.id, 'up')} disabled={pi === 0} className="text-xs text-stone-400 hover:text-stone-700 disabled:opacity-20 px-1">↑</button>
+                      <button type="button" onClick={() => movePickup(pickup.id, 'down')} disabled={pi === salonPickups.length - 1} className="text-xs text-stone-400 hover:text-stone-700 disabled:opacity-20 px-1">↓</button>
+                      <button
+                        type="button"
+                        onClick={() => togglePickup(pickup)}
+                        className={`text-[10px] px-2 py-0.5 border transition-colors ${pickup.is_active ? 'bg-stone-800 text-white border-stone-800' : 'text-stone-500 border-stone-300 hover:border-stone-500'}`}
+                      >
+                        {pickup.is_active ? '公開' : '非表示'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (isEditingThis) {
+                            setEditingPickupId(null);
+                          } else {
+                            setEditingPickupId(pickup.id);
+                            setPickupMeta({
+                              label: pickup.label ?? '',
+                              alt: pickup.alt ?? '',
+                              link_href: pickup.link_href ?? '',
+                            });
+                          }
+                        }}
+                        className="text-xs tracking-wider text-stone-600 border border-stone-300 px-2 py-0.5 hover:border-stone-500 transition-colors"
+                      >
+                        {isEditingThis ? '閉じる' : '編集'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deletePickup(pickup)}
+                        className="text-[10px] text-red-400 border border-red-200 px-2 py-0.5 hover:border-red-400 transition-colors"
+                      >
+                        削除
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* インライン編集フォーム */}
+                  {isEditingThis && (
+                    <div className="border-t border-stone-200 p-4 space-y-3 bg-stone-50">
+                      <div>
+                        <label className="block text-[10px] tracking-widest text-stone-500 mb-1">ラベル</label>
+                        <input
+                          type="text"
+                          value={pickupMeta.label}
+                          onChange={e => setPickupMeta(prev => ({ ...prev, label: e.target.value }))}
+                          className="w-full text-xs text-stone-700 border border-stone-200 p-2 focus:outline-none focus:border-stone-400"
+                          placeholder="例：髪質改善"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] tracking-widest text-stone-500 mb-1">alt テキスト</label>
+                        <input
+                          type="text"
+                          value={pickupMeta.alt}
+                          onChange={e => setPickupMeta(prev => ({ ...prev, alt: e.target.value }))}
+                          className="w-full text-xs text-stone-700 border border-stone-200 p-2 focus:outline-none focus:border-stone-400"
+                          placeholder="画像の説明文"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] tracking-widest text-stone-500 mb-1">リンク URL</label>
+                        <input
+                          type="text"
+                          value={pickupMeta.link_href}
+                          onChange={e => setPickupMeta(prev => ({ ...prev, link_href: e.target.value }))}
+                          className="w-full text-xs text-stone-700 border border-stone-200 p-2 focus:outline-none focus:border-stone-400"
+                          placeholder="https://... または /menu/color など"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => savePickupMeta(pickup)}
+                          className="text-xs tracking-wider text-white bg-stone-800 px-5 py-1.5 hover:bg-stone-700 transition-colors"
+                        >
+                          保存する
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingPickupId(null)}
+                          className="text-xs tracking-wider text-stone-600 border border-stone-300 px-5 py-1.5 hover:border-stone-500 transition-colors"
+                        >
+                          キャンセル
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={() => salonPickupFileRef.current?.click()}
+          disabled={uploadingPickup}
+          className="text-xs tracking-wider text-stone-600 border border-stone-300 px-4 py-1.5 hover:border-stone-500 transition-colors disabled:opacity-40"
+        >
+          {uploadingPickup ? 'アップロード中...' : '+ ピックアップを追加'}
+        </button>
+        <p className="text-[10px] text-stone-400 mt-1">画像: jpg/png/webp/gif（5MB以下）　動画: mp4/mov/webm（50MB以下）</p>
+      </div>
     </div>
   );
 }
