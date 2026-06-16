@@ -11,6 +11,7 @@ import StaffCard from '@/components/cards/StaffCard';
 import LazyAutoPlayVideo from '@/components/ui/LazyAutoPlayVideo';
 import SalonHeroSlider from '@/components/sections/SalonHeroSlider';
 import type { SalonHeroSlide } from '@/components/sections/SalonHeroSlider';
+import PickupSection from '@/components/sections/PickupSection';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 type SalonDetailProps = {
@@ -270,6 +271,9 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
           </div>
         </Container>
       </section>
+
+      {/* ── Pick Up ── */}
+      <PickupSection />
 
       {/* ── LP セクション ── */}
       {nonHeroSections.map((sec, i) => {
