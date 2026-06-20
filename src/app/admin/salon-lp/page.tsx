@@ -91,30 +91,15 @@ type LpSection = {
   is_active: boolean;
 };
 
-type SectionItemMedia = {
+type SectionMedia = {
   id: string;
-  media_type: 'image' | 'video';
-  media_role: 'gallery' | 'before' | 'after';
-  url: string;
-  alt_text: string | null;
+  section_id: string;
+  media_url: string;
+  media_type: 'image' | 'video' | null;
+  media_aspect: 'video' | 'portrait' | 'square' | 'vertical';
+  media_position: 'center' | 'top' | 'bottom' | 'left' | 'right';
   sort_order: number;
-  is_published: boolean;
-};
-
-type SectionItem = {
-  id: string;
-  salon_slug: string;
-  section_key: 'atmosphere' | 'technique' | 'before_after';
-  title: string;
-  description: string;
-  sort_order: number;
-  is_published: boolean;
-  media: SectionItemMedia[];
-};
-
-type ItemForm = {
-  title: string;
-  description: string;
+  is_active: boolean;
 };
 
 type SectionForm = {
@@ -148,14 +133,11 @@ export default function AdminSalonLpPage() {
   const [uploadingSlide, setUploadingSlide] = useState(false);
   const heroSlideFileRef = useRef<HTMLInputElement>(null);
 
-  const [sectionItems, setSectionItems] = useState<SectionItem[]>([]);
-  const [loadingItems, setLoadingItems] = useState(false);
-  const [editingItemId, setEditingItemId] = useState<string | null>(null);
-  const [itemForm, setItemForm] = useState<ItemForm | null>(null);
-  const [uploadingItemMedia, setUploadingItemMedia] = useState(false);
-  const [uploadingItemId, setUploadingItemId] = useState<string | null>(null);
-  const itemMediaFileRef = useRef<HTMLInputElement>(null);
-  const pendingItemId = useRef<{ itemId: string; role: 'gallery' | 'before' | 'after' } | null>(null);
+  const [sectionMedia, setSectionMedia] = useState<SectionMedia[]>([]);
+  const [loadingSectionMedia, setLoadingSectionMedia] = useState(false);
+  const [uploadingSectionMedia, setUploadingSectionMedia] = useState(false);
+  const sectionMediaFileRef = useRef<HTMLInputElement>(null);
+  const pendingSectionMedia = useRef<{ sectionId: string } | null>(null);
 
   const [salonPickups, setSalonPickups] = useState<SalonPickup[]>([]);
   const [loadingPickups, setLoadingPickups] = useState(false);
@@ -240,48 +222,49 @@ export default function AdminSalonLpPage() {
     })));
   }, [supabase]);
 
-  const loadItems = useCallback(async (slug: string, sectionKey: string) => {
+  const loadSectionMedia = useCallback(async (sectionId: string) => {
     if (!supabase) return;
-    setLoadingItems(true);
+    setLoadingSectionMedia(true);
     const { data, error } = await supabase
-      .from('salon_lp_section_items')
-      .select('id, salon_slug, section_key, title, description, sort_order, is_published, salon_lp_item_media(id, media_type, media_role, url, alt_text, sort_order, is_published)')
-      .eq('salon_slug', slug)
-      .eq('section_key', sectionKey)
+      .from('salon_lp_section_media')
+      .select('id, section_id, media_url, media_type, media_aspect, media_position, sort_order, is_active')
+      .eq('section_id', sectionId)
       .order('sort_order', { ascending: true });
-    setLoadingItems(false);
-    if (error) { showMessage(`項目読み込み失敗: ${error.message}`); return; }
-    setSectionItems((data ?? []).map(r => {
-      const rawMedia = (r as Record<string, unknown>).salon_lp_item_media;
-      const media: SectionItemMedia[] = Array.isArray(rawMedia)
-        ? (rawMedia as SectionItemMedia[]).sort((a, b) => a.sort_order - b.sort_order)
-        : [];
-      return {
-        id: r.id,
-        salon_slug: r.salon_slug,
-        section_key: r.section_key as SectionItem['section_key'],
-        title: r.title ?? '',
-        description: r.description ?? '',
-        sort_order: r.sort_order,
-        is_published: r.is_published,
-        media,
-      };
-    }));
+    setLoadingSectionMedia(false);
+    if (error) { showMessage(`メディア読み込み失敗: ${error.message}`); return; }
+    setSectionMedia((data ?? []).map(r => ({
+      id: r.id,
+      section_id: r.section_id,
+      media_url: r.media_url,
+      media_type: (r.media_type ?? null) as SectionMedia['media_type'],
+      media_aspect: (r.media_aspect ?? 'video') as SectionMedia['media_aspect'],
+      media_position: (r.media_position ?? 'center') as SectionMedia['media_position'],
+      sort_order: r.sort_order,
+      is_active: r.is_active,
+    })));
   }, [supabase]);
 
   useEffect(() => {
     setEditingId(null);
     setForm(null);
     setEditingPickupId(null);
-    setEditingItemId(null);
     loadSections(selectedSlug);
     loadSlides(selectedSlug);
     loadPickups(selectedSlug);
   }, [loadSections, loadSlides, loadPickups, selectedSlug]);
 
   useEffect(() => {
-    loadItems(selectedSlug, 'before_after');
-  }, [loadItems, selectedSlug]);
+    if (editingId) {
+      const sec = sections.find(s => s.id === editingId);
+      if (sec?.section_type === 'before_after') {
+        loadSectionMedia(editingId);
+      } else {
+        setSectionMedia([]);
+      }
+    } else {
+      setSectionMedia([]);
+    }
+  }, [editingId, sections, loadSectionMedia]);
 
   const setField = <K extends keyof SectionForm>(key: K, value: SectionForm[K]) => {
     setForm(prev => prev ? { ...prev, [key]: value } : prev);
@@ -400,69 +383,7 @@ export default function AdminSalonLpPage() {
     await loadSections(selectedSlug);
   };
 
-  const addItem = async () => {
-    if (!supabase) return;
-    const nextOrder = sectionItems.length > 0
-      ? Math.max(...sectionItems.map(i => i.sort_order)) + 1
-      : 0;
-    const { error } = await supabase
-      .from('salon_lp_section_items')
-      .insert({ salon_slug: selectedSlug, section_key: 'before_after', sort_order: nextOrder, is_published: true });
-    if (error) { showMessage(`追加失敗: ${error.message}`); return; }
-    showMessage('項目を追加しました');
-    await loadItems(selectedSlug, 'before_after');
-  };
-
-  const saveItem = async (itemId: string) => {
-    if (!supabase || !itemForm) return;
-    const { error } = await supabase
-      .from('salon_lp_section_items')
-      .update({ title: itemForm.title || null, description: itemForm.description || null })
-      .eq('id', itemId);
-    if (error) { showMessage(`保存失敗: ${error.message}`); return; }
-    showMessage('保存しました');
-    setEditingItemId(null);
-    await loadItems(selectedSlug, 'before_after');
-  };
-
-  const deleteItem = async (itemId: string) => {
-    if (!supabase) return;
-    if (!window.confirm('この項目とすべてのメディアを削除しますか？')) return;
-    const item = sectionItems.find(i => i.id === itemId);
-    if (item) {
-      for (const m of item.media) {
-        const path = extractStoragePath(m.url);
-        if (path) await supabase.storage.from(BUCKET).remove([path]);
-      }
-    }
-    const { error } = await supabase.from('salon_lp_section_items').delete().eq('id', itemId);
-    if (error) { showMessage(`削除失敗: ${error.message}`); return; }
-    showMessage('項目を削除しました');
-    if (editingItemId === itemId) setEditingItemId(null);
-    await loadItems(selectedSlug, 'before_after');
-  };
-
-  const moveItem = async (itemId: string, dir: 'up' | 'down') => {
-    if (!supabase) return;
-    const idx = sectionItems.findIndex(i => i.id === itemId);
-    const targetIdx = dir === 'up' ? idx - 1 : idx + 1;
-    if (targetIdx < 0 || targetIdx >= sectionItems.length) return;
-    const a = sectionItems[idx];
-    const b = sectionItems[targetIdx];
-    await Promise.all([
-      supabase.from('salon_lp_section_items').update({ sort_order: b.sort_order }).eq('id', a.id),
-      supabase.from('salon_lp_section_items').update({ sort_order: a.sort_order }).eq('id', b.id),
-    ]);
-    await loadItems(selectedSlug, 'before_after');
-  };
-
-  const toggleItem = async (itemId: string, current: boolean) => {
-    if (!supabase) return;
-    await supabase.from('salon_lp_section_items').update({ is_published: !current }).eq('id', itemId);
-    await loadItems(selectedSlug, 'before_after');
-  };
-
-  const uploadItemMedia = async (file: File, itemId: string, role: 'gallery' | 'before' | 'after') => {
+  const uploadSectionMedia = async (file: File, sectionId: string) => {
     if (!supabase) return;
     const isImage = IMAGE_TYPES.includes(file.type);
     const isVideo = VIDEO_TYPES.includes(file.type);
@@ -470,8 +391,7 @@ export default function AdminSalonLpPage() {
     if (isImage && file.size > IMAGE_MAX_SIZE) { showMessage('画像のサイズは 5MB 以下にしてください'); return; }
     if (isVideo && file.size > VIDEO_MAX_SIZE) { showMessage('動画のサイズは 50MB 以下にしてください'); return; }
 
-    setUploadingItemMedia(true);
-    setUploadingItemId(itemId);
+    setUploadingSectionMedia(true);
     try {
       const ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg';
       const path = `salons/${selectedSlug}/lp/before_after/${Date.now()}.${ext}`;
@@ -479,49 +399,57 @@ export default function AdminSalonLpPage() {
       if (uploadErr) { showMessage(`アップロード失敗: ${uploadErr.message}`); return; }
       const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(path);
       const mediaType: 'image' | 'video' = isVideo ? 'video' : 'image';
-      const item = sectionItems.find(i => i.id === itemId);
-      const nextOrder = item && item.media.length > 0
-        ? Math.max(...item.media.map(m => m.sort_order)) + 1
+      const nextOrder = sectionMedia.length > 0
+        ? Math.max(...sectionMedia.map(m => m.sort_order)) + 1
         : 0;
       const { error: dbErr } = await supabase
-        .from('salon_lp_item_media')
-        .insert({ item_id: itemId, media_type: mediaType, media_role: role, url: publicUrl, sort_order: nextOrder, is_published: true });
+        .from('salon_lp_section_media')
+        .insert({ section_id: sectionId, media_url: publicUrl, media_type: mediaType, sort_order: nextOrder });
       if (dbErr) { showMessage(`DB保存失敗: ${dbErr.message}`); return; }
       showMessage('メディアを追加しました');
-      await loadItems(selectedSlug, 'before_after');
+      await loadSectionMedia(sectionId);
     } finally {
-      setUploadingItemMedia(false);
-      setUploadingItemId(null);
-      if (itemMediaFileRef.current) itemMediaFileRef.current.value = '';
-      pendingItemId.current = null;
+      setUploadingSectionMedia(false);
+      if (sectionMediaFileRef.current) sectionMediaFileRef.current.value = '';
+      pendingSectionMedia.current = null;
     }
   };
 
-  const deleteItemMedia = async (mediaId: string, url: string) => {
+  const deleteSectionMedia = async (mediaId: string, mediaUrl: string, sectionId: string) => {
     if (!supabase) return;
     if (!window.confirm('このメディアを削除しますか？')) return;
-    const path = extractStoragePath(url);
+    const path = extractStoragePath(mediaUrl);
     if (path) await supabase.storage.from(BUCKET).remove([path]);
-    const { error } = await supabase.from('salon_lp_item_media').delete().eq('id', mediaId);
+    const { error } = await supabase.from('salon_lp_section_media').delete().eq('id', mediaId);
     if (error) { showMessage(`削除失敗: ${error.message}`); return; }
     showMessage('メディアを削除しました');
-    await loadItems(selectedSlug, 'before_after');
+    await loadSectionMedia(sectionId);
   };
 
-  const moveItemMedia = async (mediaId: string, itemId: string, dir: 'up' | 'down') => {
+  const moveSectionMedia = async (mediaId: string, sectionId: string, dir: 'up' | 'down') => {
     if (!supabase) return;
-    const item = sectionItems.find(i => i.id === itemId);
-    if (!item) return;
-    const idx = item.media.findIndex(m => m.id === mediaId);
+    const idx = sectionMedia.findIndex(m => m.id === mediaId);
     const targetIdx = dir === 'up' ? idx - 1 : idx + 1;
-    if (targetIdx < 0 || targetIdx >= item.media.length) return;
-    const a = item.media[idx];
-    const b = item.media[targetIdx];
+    if (targetIdx < 0 || targetIdx >= sectionMedia.length) return;
+    const a = sectionMedia[idx];
+    const b = sectionMedia[targetIdx];
     await Promise.all([
-      supabase.from('salon_lp_item_media').update({ sort_order: b.sort_order }).eq('id', a.id),
-      supabase.from('salon_lp_item_media').update({ sort_order: a.sort_order }).eq('id', b.id),
+      supabase.from('salon_lp_section_media').update({ sort_order: b.sort_order }).eq('id', a.id),
+      supabase.from('salon_lp_section_media').update({ sort_order: a.sort_order }).eq('id', b.id),
     ]);
-    await loadItems(selectedSlug, 'before_after');
+    await loadSectionMedia(sectionId);
+  };
+
+  const toggleSectionMedia = async (mediaId: string, sectionId: string, current: boolean) => {
+    if (!supabase) return;
+    await supabase.from('salon_lp_section_media').update({ is_active: !current }).eq('id', mediaId);
+    await loadSectionMedia(sectionId);
+  };
+
+  const updateSectionMediaField = async (mediaId: string, sectionId: string, field: 'media_aspect' | 'media_position', value: string) => {
+    if (!supabase) return;
+    await supabase.from('salon_lp_section_media').update({ [field]: value }).eq('id', mediaId);
+    await loadSectionMedia(sectionId);
   };
 
   const uploadSlide = async (file: File) => {
@@ -752,16 +680,16 @@ export default function AdminSalonLpPage() {
           if (file) uploadPickup(file);
         }}
       />
-      {/* hidden file input（セクション項目メディア用） */}
+      {/* hidden file input（セクションメディア用） */}
       <input
-        ref={itemMediaFileRef}
+        ref={sectionMediaFileRef}
         type="file"
         accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/webm"
         className="hidden"
         onChange={e => {
           const file = e.target.files?.[0];
-          if (file && pendingItemId.current) {
-            uploadItemMedia(file, pendingItemId.current.itemId, pendingItemId.current.role);
+          if (file && pendingSectionMedia.current) {
+            uploadSectionMedia(file, pendingSectionMedia.current.sectionId);
           }
         }}
       />
@@ -1032,161 +960,81 @@ export default function AdminSalonLpPage() {
                       </div>
                     )}
 
-                    {/* Before / After 項目管理（before_after のみ） */}
+                    {/* 複数メディア管理（before_after のみ） */}
                     {sec.section_type === 'before_after' && (
                       <div className="border-t border-stone-200 pt-5">
-                        <p className="text-[10px] tracking-widest text-stone-500 mb-1">Before / After 項目管理</p>
-                        <p className="text-[10px] text-stone-400 mb-3">項目が0件の場合は上記「画像 / 動画」がフォールバックとして表示されます</p>
-                        {loadingItems ? (
+                        <p className="text-[10px] tracking-widest text-stone-500 mb-1">複数メディア管理</p>
+                        <p className="text-[10px] text-stone-400 mb-3">メディアが0件の場合は上記「画像 / 動画」がフォールバックとして表示されます</p>
+                        {loadingSectionMedia ? (
                           <p className="text-xs text-stone-400">読み込み中...</p>
                         ) : (
-                          <div className="space-y-3 mb-3">
-                            {sectionItems.length === 0 && (
-                              <p className="text-xs text-stone-400">項目はまだありません</p>
+                          <div className="space-y-2 mb-3">
+                            {sectionMedia.length === 0 && (
+                              <p className="text-xs text-stone-400">メディアはまだありません</p>
                             )}
-                            {sectionItems.map((item, ii) => {
-                              const isEditingThis = editingItemId === item.id;
-                              const isUploadingThis = uploadingItemMedia && uploadingItemId === item.id;
-                              return (
-                                <div key={item.id} className="border border-stone-200 bg-white">
-                                  {/* 項目ヘッダー */}
-                                  <div className="flex items-center gap-3 px-3 py-2">
-                                    <div className="flex-1 min-w-0">
-                                      <p className="text-xs text-stone-700 truncate">
-                                        {item.title || '（タイトルなし）'}
-                                        <span className="text-stone-400 ml-1">#{ii + 1}</span>
-                                      </p>
-                                      <p className="text-[10px] text-stone-400">{item.media.length} 件のメディア</p>
-                                    </div>
-                                    <div className="flex items-center gap-1 shrink-0">
-                                      <button type="button" onClick={() => moveItem(item.id, 'up')} disabled={ii === 0} className="text-xs text-stone-400 hover:text-stone-700 disabled:opacity-20 px-1">↑</button>
-                                      <button type="button" onClick={() => moveItem(item.id, 'down')} disabled={ii === sectionItems.length - 1} className="text-xs text-stone-400 hover:text-stone-700 disabled:opacity-20 px-1">↓</button>
-                                      <button
-                                        type="button"
-                                        onClick={() => toggleItem(item.id, item.is_published)}
-                                        className={`text-[10px] px-2 py-0.5 border transition-colors ${item.is_published ? 'bg-stone-800 text-white border-stone-800' : 'text-stone-500 border-stone-300 hover:border-stone-500'}`}
-                                      >
-                                        {item.is_published ? '公開' : '非表示'}
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          if (isEditingThis) {
-                                            setEditingItemId(null);
-                                            setItemForm(null);
-                                          } else {
-                                            setEditingItemId(item.id);
-                                            setItemForm({ title: item.title, description: item.description });
-                                          }
-                                        }}
-                                        className="text-xs tracking-wider text-stone-600 border border-stone-300 px-2 py-0.5 hover:border-stone-500 transition-colors"
-                                      >
-                                        {isEditingThis ? '閉じる' : '編集'}
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => deleteItem(item.id)}
-                                        className="text-[10px] text-red-400 border border-red-200 px-2 py-0.5 hover:border-red-400 transition-colors"
-                                      >
-                                        削除
-                                      </button>
-                                    </div>
-                                  </div>
-
-                                  {/* 項目編集フォーム */}
-                                  {isEditingThis && itemForm && (
-                                    <div className="border-t border-stone-200 p-3 space-y-3 bg-stone-50">
-                                      <div>
-                                        <label className="block text-[10px] tracking-widest text-stone-500 mb-1">タイトル</label>
-                                        <input
-                                          type="text"
-                                          value={itemForm.title}
-                                          onChange={e => setItemForm(prev => prev ? { ...prev, title: e.target.value } : prev)}
-                                          className="w-full text-xs text-stone-700 border border-stone-200 p-2 focus:outline-none focus:border-stone-400"
-                                          placeholder="例：髪質改善トリートメント"
-                                        />
-                                      </div>
-                                      <div>
-                                        <label className="block text-[10px] tracking-widest text-stone-500 mb-1">説明文</label>
-                                        <textarea
-                                          value={itemForm.description}
-                                          onChange={e => setItemForm(prev => prev ? { ...prev, description: e.target.value } : prev)}
-                                          rows={2}
-                                          className="w-full text-xs text-stone-700 border border-stone-200 p-2 leading-relaxed resize-y focus:outline-none focus:border-stone-400"
-                                          placeholder="項目の説明（改行可）"
-                                        />
-                                      </div>
-                                      <div className="flex gap-2">
-                                        <button
-                                          type="button"
-                                          onClick={() => saveItem(item.id)}
-                                          className="text-xs tracking-wider text-white bg-stone-800 px-4 py-1.5 hover:bg-stone-700 transition-colors"
-                                        >
-                                          保存する
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() => { setEditingItemId(null); setItemForm(null); }}
-                                          className="text-xs tracking-wider text-stone-600 border border-stone-300 px-4 py-1.5 hover:border-stone-500 transition-colors"
-                                        >
-                                          キャンセル
-                                        </button>
-                                      </div>
-
-                                      {/* メディア管理（Before / After / Gallery） */}
-                                      <div className="border-t border-stone-200 pt-3">
-                                        <p className="text-[10px] tracking-widest text-stone-400 mb-3">画像 / 動画</p>
-                                        {(['before', 'after', 'gallery'] as const).map(role => {
-                                          const roleMedia = item.media.filter(m => m.media_role === role);
-                                          const roleLabel = role === 'before' ? 'Before' : role === 'after' ? 'After' : 'ギャラリー';
-                                          return (
-                                            <div key={role} className="mb-3">
-                                              <p className="text-[10px] text-stone-400 mb-1.5">{roleLabel}</p>
-                                              <div className="flex flex-wrap gap-2 mb-1.5">
-                                                {roleMedia.map((m, mi) => (
-                                                  <div key={m.id}>
-                                                    <div className="w-20 h-14 bg-stone-100 overflow-hidden relative">
-                                                      {m.media_type === 'video' ? (
-                                                        <video src={m.url} className="absolute inset-0 w-full h-full object-cover" muted playsInline />
-                                                      ) : (
-                                                        <img src={m.url} alt="" className="absolute inset-0 w-full h-full object-cover" />
-                                                      )}
-                                                    </div>
-                                                    <div className="flex gap-0.5 mt-1">
-                                                      <button type="button" onClick={() => moveItemMedia(m.id, item.id, 'up')} disabled={mi === 0} className="text-[9px] text-stone-400 hover:text-stone-700 disabled:opacity-20 px-0.5">↑</button>
-                                                      <button type="button" onClick={() => moveItemMedia(m.id, item.id, 'down')} disabled={mi === roleMedia.length - 1} className="text-[9px] text-stone-400 hover:text-stone-700 disabled:opacity-20 px-0.5">↓</button>
-                                                      <button type="button" onClick={() => deleteItemMedia(m.id, m.url)} className="text-[9px] text-red-400 hover:text-red-600 px-0.5">✕</button>
-                                                    </div>
-                                                  </div>
-                                                ))}
-                                              </div>
-                                              <button
-                                                type="button"
-                                                disabled={isUploadingThis}
-                                                onClick={() => { pendingItemId.current = { itemId: item.id, role }; itemMediaFileRef.current?.click(); }}
-                                                className="text-[10px] tracking-wider text-stone-600 border border-stone-300 px-3 py-1 hover:border-stone-500 transition-colors disabled:opacity-40"
-                                              >
-                                                {isUploadingThis ? 'アップロード中...' : `+ ${roleLabel}を追加`}
-                                              </button>
-                                            </div>
-                                          );
-                                        })}
-                                        <p className="text-[10px] text-stone-400">画像: jpg/png/webp/gif（5MB以下）　動画: mp4/mov/webm（50MB以下）</p>
-                                      </div>
-                                    </div>
+                            {sectionMedia.map((m, mi) => (
+                              <div key={m.id} className="flex items-center gap-3 border border-stone-200 p-2 bg-white">
+                                <div className="w-16 h-10 bg-stone-100 overflow-hidden relative shrink-0">
+                                  {m.media_type === 'video' ? (
+                                    <video src={m.media_url} className="absolute inset-0 w-full h-full object-cover" muted playsInline />
+                                  ) : (
+                                    <img src={m.media_url} alt="" className="absolute inset-0 w-full h-full object-cover" />
                                   )}
                                 </div>
-                              );
-                            })}
+                                <div className="flex-1 min-w-0 flex gap-2">
+                                  <select
+                                    value={m.media_aspect}
+                                    onChange={e => updateSectionMediaField(m.id, sec.id, 'media_aspect', e.target.value)}
+                                    className="text-[10px] text-stone-600 border border-stone-200 px-2 py-0.5 focus:outline-none focus:border-stone-400"
+                                  >
+                                    <option value="video">16:9</option>
+                                    <option value="portrait">4:5</option>
+                                    <option value="square">1:1</option>
+                                    <option value="vertical">9:16</option>
+                                  </select>
+                                  <select
+                                    value={m.media_position}
+                                    onChange={e => updateSectionMediaField(m.id, sec.id, 'media_position', e.target.value)}
+                                    className="text-[10px] text-stone-600 border border-stone-200 px-2 py-0.5 focus:outline-none focus:border-stone-400"
+                                  >
+                                    <option value="center">中央</option>
+                                    <option value="top">上</option>
+                                    <option value="bottom">下</option>
+                                    <option value="left">左</option>
+                                    <option value="right">右</option>
+                                  </select>
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <button type="button" onClick={() => moveSectionMedia(m.id, sec.id, 'up')} disabled={mi === 0} className="text-xs text-stone-400 hover:text-stone-700 disabled:opacity-20 px-1">↑</button>
+                                  <button type="button" onClick={() => moveSectionMedia(m.id, sec.id, 'down')} disabled={mi === sectionMedia.length - 1} className="text-xs text-stone-400 hover:text-stone-700 disabled:opacity-20 px-1">↓</button>
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleSectionMedia(m.id, sec.id, m.is_active)}
+                                    className={`text-[10px] px-2 py-0.5 border transition-colors ${m.is_active ? 'bg-stone-800 text-white border-stone-800' : 'text-stone-500 border-stone-300 hover:border-stone-500'}`}
+                                  >
+                                    {m.is_active ? '公開' : '非表示'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => deleteSectionMedia(m.id, m.media_url, sec.id)}
+                                    className="text-[10px] text-red-400 border border-red-200 px-2 py-0.5 hover:border-red-400 transition-colors"
+                                  >
+                                    削除
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         )}
                         <button
                           type="button"
-                          onClick={addItem}
-                          className="text-xs tracking-wider text-stone-600 border border-stone-300 px-4 py-1.5 hover:border-stone-500 transition-colors"
+                          onClick={() => { pendingSectionMedia.current = { sectionId: sec.id }; sectionMediaFileRef.current?.click(); }}
+                          disabled={uploadingSectionMedia}
+                          className="text-xs tracking-wider text-stone-600 border border-stone-300 px-4 py-1.5 hover:border-stone-500 transition-colors disabled:opacity-40"
                         >
-                          + 項目を追加
+                          {uploadingSectionMedia ? 'アップロード中...' : '+ メディアを追加'}
                         </button>
+                        <p className="text-[10px] text-stone-400 mt-1">画像: jpg/png/webp/gif（5MB以下）　動画: mp4/mov/webm（50MB以下）</p>
                       </div>
                     )}
 

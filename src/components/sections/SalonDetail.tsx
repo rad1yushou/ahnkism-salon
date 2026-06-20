@@ -12,8 +12,6 @@ import LazyAutoPlayVideo from '@/components/ui/LazyAutoPlayVideo';
 import SalonHeroSlider from '@/components/sections/SalonHeroSlider';
 import type { SalonHeroSlide } from '@/components/sections/SalonHeroSlider';
 import PickupSection from '@/components/sections/PickupSection';
-import SalonLpSectionItems from '@/components/sections/SalonLpSectionItems';
-import type { LpSectionItem, LpItemMedia } from '@/components/sections/SalonLpSectionItems';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 type SalonDetailProps = {
@@ -31,6 +29,15 @@ type SalonMenu = {
   sort_order: number;
 };
 
+type SectionMedia = {
+  id: string;
+  media_url: string;
+  media_type: string | null;
+  media_aspect: string;
+  media_position: string;
+  sort_order: number;
+};
+
 type LpSection = {
   id: string;
   section_type: string;
@@ -44,6 +51,7 @@ type LpSection = {
   hero_title_y_percent: number;
   layout_type: string;
   sort_order: number;
+  sectionMedia: SectionMedia[];
 };
 
 function getAspectClass(aspect: string): string {
@@ -78,11 +86,10 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
   let staff: StaffMember[] = getStaffBySalon(slug);
   let lpSections: LpSection[] = [];
   let heroSlides: SalonHeroSlide[] = [];
-  let sectionItemsMap: Record<string, LpSectionItem[]> = {};
 
   const supabase = await createSupabaseServerClient();
   if (supabase) {
-    const [salonRes, menusRes, staffRes, lpRes, slidesRes, itemsRes] = await Promise.all([
+    const [salonRes, menusRes, staffRes, lpRes, slidesRes] = await Promise.all([
       supabase
         .from('salons')
         .select('slug, name, short_name, description, address, address_postal, address_locality, tel, hours, hours_note, nearest_station, latitude, longitude, google_map_url, hotpepper_url, instagram_url, line_url, image_url')
@@ -102,7 +109,7 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
         .order('sort_order', { ascending: true }),
       supabase
         .from('salon_lp_sections')
-        .select('id, section_type, title, body, media_url, media_type, media_aspect, media_position, hero_title_position, hero_title_y_percent, layout_type, sort_order')
+        .select('id, section_type, title, body, media_url, media_type, media_aspect, media_position, hero_title_position, hero_title_y_percent, layout_type, sort_order, salon_lp_section_media(id, media_url, media_type, media_aspect, media_position, sort_order)')
         .eq('salon_slug', slug)
         .eq('is_active', true)
         .order('sort_order', { ascending: true }),
@@ -111,12 +118,6 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
         .select('media_url, media_type')
         .eq('salon_slug', slug)
         .eq('is_active', true)
-        .order('sort_order', { ascending: true }),
-      supabase
-        .from('salon_lp_section_items')
-        .select('id, section_key, title, description, sort_order, salon_lp_item_media(id, media_type, media_role, url, alt_text, sort_order)')
-        .eq('salon_slug', slug)
-        .eq('is_published', true)
         .order('sort_order', { ascending: true }),
     ]);
 
@@ -170,37 +171,27 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
     }
 
     if (!lpRes.error && lpRes.data) {
-      lpSections = lpRes.data.map(r => ({
-        ...r,
-        title: r.title ?? '',
-        body: r.body ?? '',
-        media_url: r.media_url ?? null,
-        media_type: r.media_type ?? null,
-        media_aspect: r.media_aspect ?? 'video',
-        media_position: r.media_position ?? 'center',
-        hero_title_position: r.hero_title_position ?? 'center',
-        hero_title_y_percent: r.hero_title_y_percent ?? 50,
-        layout_type: r.layout_type ?? 'detail',
-      }));
-    }
-
-    if (!itemsRes.error && itemsRes.data) {
-      for (const r of itemsRes.data) {
-        const key = r.section_key as string;
-        if (!sectionItemsMap[key]) sectionItemsMap[key] = [];
-        const rawMedia = (r as Record<string, unknown>).salon_lp_item_media;
-        const media: LpItemMedia[] = Array.isArray(rawMedia)
-          ? (rawMedia as LpItemMedia[]).sort((a, b) => a.sort_order - b.sort_order)
+      lpSections = lpRes.data.map(r => {
+        const rawMedia = (r as Record<string, unknown>).salon_lp_section_media;
+        const sectionMedia: SectionMedia[] = Array.isArray(rawMedia)
+          ? (rawMedia as SectionMedia[]).sort((a, b) => a.sort_order - b.sort_order)
           : [];
-        sectionItemsMap[key].push({
+        return {
           id: r.id,
-          section_key: key,
-          title: r.title ?? null,
-          description: r.description ?? null,
+          section_type: r.section_type,
+          title: r.title ?? '',
+          body: r.body ?? '',
+          media_url: r.media_url ?? null,
+          media_type: r.media_type ?? null,
+          media_aspect: r.media_aspect ?? 'video',
+          media_position: r.media_position ?? 'center',
+          hero_title_position: r.hero_title_position ?? 'center',
+          hero_title_y_percent: r.hero_title_y_percent ?? 50,
+          layout_type: r.layout_type ?? 'detail',
           sort_order: r.sort_order,
-          media,
-        });
-      }
+          sectionMedia,
+        };
+      });
     }
 
     if (!slidesRes.error && slidesRes.data) {
@@ -318,11 +309,9 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
       {/* ── LP セクション ── */}
       {nonHeroSections.map((sec, i) => {
         const label = SECTION_LABEL[sec.section_type] ?? sec.section_type;
-        const ITEM_SECTION_KEYS = ['atmosphere', 'technique', 'before_after'];
-        const items = sectionItemsMap[sec.section_type] ?? [];
 
-        // 雰囲気・技術・ビフォーアフターで項目が登録されている場合は新形式で表示
-        if (ITEM_SECTION_KEYS.includes(sec.section_type) && items.length > 0) {
+        // Before / After：複数メディアが登録されている場合はグリッド表示
+        if (sec.section_type === 'before_after' && sec.sectionMedia.length > 0) {
           return (
             <section key={sec.id} className="py-16 sm:py-20 border-t border-stone-100">
               <Container>
@@ -330,27 +319,51 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
                   {label}
                 </p>
                 {sec.title && (
-                  <h2 className="text-xl sm:text-2xl font-light tracking-wider text-stone-800 mb-10 text-center">
+                  <h2 className="text-xl sm:text-2xl font-light tracking-wider text-stone-800 mb-4 text-center">
                     {sec.title}
                   </h2>
                 )}
-                {sec.body && !sec.title && (
-                  <p className="text-sm text-stone-500 leading-relaxed whitespace-pre-line mb-8 text-center">
+                {sec.body && (
+                  <p className="text-sm text-stone-500 leading-relaxed whitespace-pre-line mb-10 text-center">
                     {sec.body}
                   </p>
                 )}
-                <SalonLpSectionItems
-                  sectionType={sec.section_type}
-                  layoutType={sec.layout_type}
-                  items={items}
-                  label={label}
-                />
+                <div className={`grid gap-4 sm:gap-6 ${
+                  sec.sectionMedia.length === 1
+                    ? 'grid-cols-1 max-w-md mx-auto'
+                    : sec.sectionMedia.length === 2
+                      ? 'grid-cols-1 sm:grid-cols-2'
+                      : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+                }`}>
+                  {sec.sectionMedia.map((m, idx) => {
+                    const aClass = getAspectClass(m.media_aspect);
+                    const pClass = getPositionClass(m.media_position);
+                    return (
+                      <div key={m.id} className={`${aClass} bg-stone-100 overflow-hidden relative`}>
+                        {m.media_type === 'video' ? (
+                          <LazyAutoPlayVideo
+                            src={m.media_url}
+                            className={`w-full h-full object-cover ${pClass}`}
+                          />
+                        ) : (
+                          <Image
+                            src={m.media_url}
+                            alt={`${label} ${idx + 1}`}
+                            fill
+                            className={`object-cover ${pClass}`}
+                            unoptimized
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </Container>
             </section>
           );
         }
 
-        // その他セクション・項目未登録時は既存レンダリング（後方互換）
+        // 既存レンダリング（複数メディア未登録時のフォールバック）
         const aspectClass = getAspectClass(sec.media_aspect);
         const positionClass = getPositionClass(sec.media_position);
         const hasMedia = !!sec.media_url;
