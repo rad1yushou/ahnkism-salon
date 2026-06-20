@@ -404,8 +404,19 @@ export default function AdminSalonLpPage() {
         : 0;
       const { error: dbErr } = await supabase
         .from('salon_lp_section_media')
-        .insert({ section_id: sectionId, media_url: publicUrl, media_type: mediaType, sort_order: nextOrder });
-      if (dbErr) { showMessage(`DB保存失敗: ${dbErr.message}`); return; }
+        .insert({
+          section_id: sectionId,
+          media_url: publicUrl,
+          media_type: mediaType,
+          media_aspect: 'video',
+          media_position: 'center',
+          is_active: true,
+          sort_order: nextOrder,
+        });
+      if (dbErr) {
+        showMessage(`DB保存失敗: ${dbErr.message}`);
+        return;
+      }
       showMessage('メディアを追加しました');
       await loadSectionMedia(sectionId);
     } finally {

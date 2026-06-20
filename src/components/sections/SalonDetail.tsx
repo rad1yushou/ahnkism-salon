@@ -109,7 +109,7 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
         .order('sort_order', { ascending: true }),
       supabase
         .from('salon_lp_sections')
-        .select('id, section_type, title, body, media_url, media_type, media_aspect, media_position, hero_title_position, hero_title_y_percent, layout_type, sort_order, salon_lp_section_media(id, media_url, media_type, media_aspect, media_position, sort_order)')
+        .select('id, section_type, title, body, media_url, media_type, media_aspect, media_position, hero_title_position, hero_title_y_percent, layout_type, sort_order')
         .eq('salon_slug', slug)
         .eq('is_active', true)
         .order('sort_order', { ascending: true }),
@@ -171,27 +171,40 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
     }
 
     if (!lpRes.error && lpRes.data) {
-      lpSections = lpRes.data.map(r => {
-        const rawMedia = (r as Record<string, unknown>).salon_lp_section_media;
-        const sectionMedia: SectionMedia[] = Array.isArray(rawMedia)
-          ? (rawMedia as SectionMedia[]).sort((a, b) => a.sort_order - b.sort_order)
-          : [];
-        return {
-          id: r.id,
-          section_type: r.section_type,
-          title: r.title ?? '',
-          body: r.body ?? '',
-          media_url: r.media_url ?? null,
-          media_type: r.media_type ?? null,
-          media_aspect: r.media_aspect ?? 'video',
-          media_position: r.media_position ?? 'center',
-          hero_title_position: r.hero_title_position ?? 'center',
-          hero_title_y_percent: r.hero_title_y_percent ?? 50,
-          layout_type: r.layout_type ?? 'detail',
-          sort_order: r.sort_order,
-          sectionMedia,
-        };
-      });
+      // section_media を別クエリで取得（失敗してもセクション表示には影響しない）
+      const sectionMediaMap: Record<string, SectionMedia[]> = {};
+      const sectionIds = lpRes.data.map(r => r.id);
+      if (sectionIds.length > 0) {
+        const { data: smData } = await supabase
+          .from('salon_lp_section_media')
+          .select('id, section_id, media_url, media_type, media_aspect, media_position, sort_order')
+          .in('section_id', sectionIds)
+          .eq('is_active', true)
+          .order('sort_order', { ascending: true });
+        if (smData) {
+          for (const m of smData) {
+            const sid = (m as { section_id: string }).section_id;
+            if (!sectionMediaMap[sid]) sectionMediaMap[sid] = [];
+            sectionMediaMap[sid].push(m as SectionMedia);
+          }
+        }
+      }
+
+      lpSections = lpRes.data.map(r => ({
+        id: r.id,
+        section_type: r.section_type,
+        title: r.title ?? '',
+        body: r.body ?? '',
+        media_url: r.media_url ?? null,
+        media_type: r.media_type ?? null,
+        media_aspect: r.media_aspect ?? 'video',
+        media_position: r.media_position ?? 'center',
+        hero_title_position: r.hero_title_position ?? 'center',
+        hero_title_y_percent: r.hero_title_y_percent ?? 50,
+        layout_type: r.layout_type ?? 'detail',
+        sort_order: r.sort_order,
+        sectionMedia: sectionMediaMap[r.id] ?? [],
+      }));
     }
 
     if (!slidesRes.error && slidesRes.data) {
