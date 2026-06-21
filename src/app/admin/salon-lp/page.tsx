@@ -297,8 +297,16 @@ export default function AdminSalonLpPage() {
 
   const saveEdit = async (sectionId: string) => {
     if (!supabase || !form) return;
+
+    // セッション確認（未認証だと RLS でサイレントに 0 件更新になるため）
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      showMessage('セッションが切れています。ページを再読み込みしてログインし直してください。');
+      return;
+    }
+
     setSaving(true);
-    const { error } = await supabase
+    const { data: updated, error } = await supabase
       .from('salon_lp_sections')
       .update({
         title: form.title,
@@ -309,9 +317,21 @@ export default function AdminSalonLpPage() {
         hero_title_y_percent: form.hero_title_y_percent,
         is_active: form.is_active,
       })
-      .eq('id', sectionId);
+      .eq('id', sectionId)
+      .select('id');
     setSaving(false);
-    if (error) { showMessage(`保存失敗: ${error.message}`); return; }
+
+    if (error) {
+      console.error('[saveEdit] Supabase error:', error);
+      showMessage(`保存失敗: ${error.message}`);
+      return;
+    }
+    if (!updated || updated.length === 0) {
+      console.error('[saveEdit] 0 rows updated – RLS or wrong id', { sectionId, session: session.user.email });
+      showMessage('保存失敗: 更新対象が見つかりません（権限エラーの可能性があります）');
+      return;
+    }
+
     showMessage('保存しました');
     cancelEdit();
     await loadSections(selectedSlug);
