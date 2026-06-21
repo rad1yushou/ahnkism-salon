@@ -4,6 +4,8 @@ import { getSalonBySlug } from '@/constants/salons';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import SalonDetail from '@/components/sections/SalonDetail';
 
+export const revalidate = 0;
+
 const SLUG = 'labo';
 
 export async function generateMetadata(): Promise<Metadata> {

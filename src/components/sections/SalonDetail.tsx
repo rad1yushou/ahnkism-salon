@@ -174,13 +174,18 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
       // section_media を別クエリで取得（失敗してもセクション表示には影響しない）
       const sectionMediaMap: Record<string, SectionMedia[]> = {};
       const sectionIds = lpRes.data.map(r => r.id);
+      console.log(`[SalonDetail:${slug}] sections(${lpRes.data.length}):`, lpRes.data.map(r => `${r.section_type}(${r.id.slice(0, 8)})`).join(', '));
       if (sectionIds.length > 0) {
-        const { data: smData } = await supabase
+        const { data: smData, error: smError } = await supabase
           .from('salon_lp_section_media')
           .select('id, section_id, media_url, media_type, media_aspect, media_position, sort_order')
           .in('section_id', sectionIds)
           .eq('is_active', true)
           .order('sort_order', { ascending: true });
+        if (smError) {
+          console.error(`[SalonDetail:${slug}] sectionMedia query error:`, smError);
+        }
+        console.log(`[SalonDetail:${slug}] sectionMedia rows: ${smData?.length ?? 0}`, smData?.map(m => `${(m as { section_id: string }).section_id.slice(0, 8)}`) ?? []);
         if (smData) {
           for (const m of smData) {
             const sid = (m as { section_id: string }).section_id;
@@ -189,6 +194,7 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
           }
         }
       }
+      console.log(`[SalonDetail:${slug}] sectionMediaMap keys:`, Object.entries(sectionMediaMap).map(([k, v]) => `${k.slice(0, 8)}(${v.length})`).join(', '));
 
       lpSections = lpRes.data.map(r => ({
         id: r.id,
