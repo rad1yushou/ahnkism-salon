@@ -323,8 +323,8 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
       {nonHeroSections.map((sec, i) => {
         const label = SECTION_LABEL[sec.section_type] ?? sec.section_type;
 
-        // Before / After：複数メディアが登録されている場合はグリッド表示
-        if (sec.section_type === 'before_after' && sec.sectionMedia.length > 0) {
+        // 複数メディアが登録されている場合はグリッド表示（before_after / atmosphere / technique / staff_vibe）
+        if (sec.sectionMedia.length > 0) {
           return (
             <section key={sec.id} className="py-16 sm:py-20 border-t border-stone-100">
               <Container>

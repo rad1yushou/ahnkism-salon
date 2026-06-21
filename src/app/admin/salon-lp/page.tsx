@@ -137,7 +137,7 @@ export default function AdminSalonLpPage() {
   const [loadingSectionMedia, setLoadingSectionMedia] = useState(false);
   const [uploadingSectionMedia, setUploadingSectionMedia] = useState(false);
   const sectionMediaFileRef = useRef<HTMLInputElement>(null);
-  const pendingSectionMedia = useRef<{ sectionId: string } | null>(null);
+  const pendingSectionMedia = useRef<{ sectionId: string; sectionType: string } | null>(null);
 
   const [salonPickups, setSalonPickups] = useState<SalonPickup[]>([]);
   const [loadingPickups, setLoadingPickups] = useState(false);
@@ -258,10 +258,12 @@ export default function AdminSalonLpPage() {
     loadPickups(selectedSlug);
   }, [loadSections, loadSlides, loadPickups, selectedSlug]);
 
+  const MULTI_MEDIA_TYPES = new Set(['atmosphere', 'technique', 'staff_vibe', 'before_after']);
+
   useEffect(() => {
     if (editingId) {
       const sec = sections.find(s => s.id === editingId);
-      if (sec?.section_type === 'before_after') {
+      if (sec && MULTI_MEDIA_TYPES.has(sec.section_type)) {
         loadSectionMedia(editingId);
       } else {
         setSectionMedia([]);
@@ -388,7 +390,7 @@ export default function AdminSalonLpPage() {
     await loadSections(selectedSlug);
   };
 
-  const uploadSectionMedia = async (file: File, sectionId: string) => {
+  const uploadSectionMedia = async (file: File, sectionId: string, sectionType: string) => {
     if (!supabase) return;
     const isImage = IMAGE_TYPES.includes(file.type);
     const isVideo = VIDEO_TYPES.includes(file.type);
@@ -399,41 +401,33 @@ export default function AdminSalonLpPage() {
     setUploadingSectionMedia(true);
     try {
       const ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg';
-      const path = `salons/${selectedSlug}/lp/before_after/${Date.now()}.${ext}`;
-      showMessage(`[1/4] Storage アップロード開始...`);
+      const path = `salons/${selectedSlug}/lp/${sectionType}/${Date.now()}.${ext}`;
       const { error: uploadErr } = await supabase.storage.from(BUCKET).upload(path, file);
       if (uploadErr) {
-        showMessage(`[Storage 失敗] ${uploadErr.message}`);
+        showMessage(`アップロード失敗: ${uploadErr.message}`);
         return;
       }
-      showMessage(`[2/4] Storage 完了。DB insert 開始...`);
       const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(path);
       const mediaType: 'image' | 'video' = isVideo ? 'video' : 'image';
       const nextOrder = sectionMedia.length > 0
         ? Math.max(...sectionMedia.map(m => m.sort_order)) + 1
         : 0;
-      const payload = {
-        section_id: sectionId,
-        media_url: publicUrl,
-        media_type: mediaType,
-        media_aspect: 'portrait',
-        media_position: 'center',
-        is_active: true,
-        sort_order: nextOrder,
-      };
-      console.log('[uploadSectionMedia] insert payload:', payload);
-      const { data: insertedData, error: dbErr } = await supabase
+      const { error: dbErr } = await supabase
         .from('salon_lp_section_media')
-        .insert(payload)
-        .select()
-        .single();
+        .insert({
+          section_id: sectionId,
+          media_url: publicUrl,
+          media_type: mediaType,
+          media_aspect: 'portrait',
+          media_position: 'center',
+          is_active: true,
+          sort_order: nextOrder,
+        });
       if (dbErr) {
-        console.error('[uploadSectionMedia] insert error:', dbErr);
-        showMessage(`[DB 失敗] code:${dbErr.code} ${dbErr.message}${dbErr.hint ? ' hint:' + dbErr.hint : ''}${dbErr.details ? ' details:' + dbErr.details : ''}`);
+        showMessage(`DB保存失敗: ${dbErr.code} ${dbErr.message}`);
         return;
       }
-      console.log('[uploadSectionMedia] insert success:', insertedData);
-      showMessage(`[4/4] メディアを追加しました`);
+      showMessage('メディアを追加しました');
       await loadSectionMedia(sectionId);
     } finally {
       setUploadingSectionMedia(false);
@@ -716,7 +710,7 @@ export default function AdminSalonLpPage() {
         onChange={e => {
           const file = e.target.files?.[0];
           if (file && pendingSectionMedia.current) {
-            uploadSectionMedia(file, pendingSectionMedia.current.sectionId);
+            uploadSectionMedia(file, pendingSectionMedia.current.sectionId, pendingSectionMedia.current.sectionType);
           }
         }}
       />
@@ -987,8 +981,8 @@ export default function AdminSalonLpPage() {
                       </div>
                     )}
 
-                    {/* 複数メディア管理（before_after のみ） */}
-                    {sec.section_type === 'before_after' && (
+                    {/* 複数メディア管理（atmosphere / technique / staff_vibe / before_after） */}
+                    {MULTI_MEDIA_TYPES.has(sec.section_type) && (
                       <div className="border-t border-stone-200 pt-5">
                         <p className="text-[10px] tracking-widest text-stone-500 mb-1">複数メディア管理</p>
                         <p className="text-[10px] text-stone-400 mb-3">メディアが0件の場合は上記「画像 / 動画」がフォールバックとして表示されます</p>
@@ -1055,7 +1049,7 @@ export default function AdminSalonLpPage() {
                         )}
                         <button
                           type="button"
-                          onClick={() => { pendingSectionMedia.current = { sectionId: sec.id }; sectionMediaFileRef.current?.click(); }}
+                          onClick={() => { pendingSectionMedia.current = { sectionId: sec.id, sectionType: sec.section_type }; sectionMediaFileRef.current?.click(); }}
                           disabled={uploadingSectionMedia}
                           className="text-xs tracking-wider text-stone-600 border border-stone-300 px-4 py-1.5 hover:border-stone-500 transition-colors disabled:opacity-40"
                         >
