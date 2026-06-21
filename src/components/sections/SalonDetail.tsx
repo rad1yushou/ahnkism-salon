@@ -341,18 +341,11 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
                     {sec.body}
                   </p>
                 )}
-                <div className={`grid gap-4 sm:gap-6 ${
-                  sec.sectionMedia.length === 1
-                    ? 'grid-cols-1 max-w-md mx-auto'
-                    : sec.sectionMedia.length === 2
-                      ? 'grid-cols-1 sm:grid-cols-2'
-                      : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
-                }`}>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-5">
                   {sec.sectionMedia.map((m, idx) => {
-                    const aClass = getAspectClass(m.media_aspect);
                     const pClass = getPositionClass(m.media_position);
                     return (
-                      <div key={m.id} className={`${aClass} bg-stone-100 overflow-hidden relative`}>
+                      <div key={m.id} className="aspect-[4/5] bg-stone-100 overflow-hidden relative">
                         {m.media_type === 'video' ? (
                           <LazyAutoPlayVideo
                             src={m.media_url}
@@ -395,7 +388,7 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
                 }`}
               >
                 {hasMedia && (
-                  <div className={`w-full sm:w-2/5 shrink-0 ${aspectClass} bg-stone-100 overflow-hidden relative`}>
+                  <div className={`w-full sm:w-1/3 sm:max-w-[260px] shrink-0 ${aspectClass} bg-stone-100 overflow-hidden relative`}>
                     {sec.media_type === 'video' ? (
                       <LazyAutoPlayVideo
                         src={sec.media_url!}
@@ -441,10 +434,10 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
             <h2 className="text-xl font-light tracking-wider text-stone-800 mb-10 text-center">
               人気メニュー
             </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-5">
               {salonMenus.map((menu) => (
                 <div key={menu.id} className="border border-stone-200 bg-white">
-                  <div className="aspect-[4/3] relative bg-stone-100 overflow-hidden flex items-center justify-center">
+                  <div className="aspect-[4/5] relative bg-stone-100 overflow-hidden flex items-center justify-center">
                     {menu.image_url ? (
                       menu.media_type === 'video' ? (
                         <LazyAutoPlayVideo

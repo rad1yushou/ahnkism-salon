@@ -231,7 +231,12 @@ export default function AdminSalonLpPage() {
       .eq('section_id', sectionId)
       .order('sort_order', { ascending: true });
     setLoadingSectionMedia(false);
-    if (error) { showMessage(`メディア読み込み失敗: ${error.message}`); return; }
+    if (error) {
+      console.error('[loadSectionMedia] error:', error);
+      showMessage(`メディア読み込み失敗: ${error.message}`);
+      return;
+    }
+    console.log('[loadSectionMedia] rows:', data?.length, data);
     setSectionMedia((data ?? []).map(r => ({
       id: r.id,
       section_id: r.section_id,
@@ -395,29 +400,40 @@ export default function AdminSalonLpPage() {
     try {
       const ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg';
       const path = `salons/${selectedSlug}/lp/before_after/${Date.now()}.${ext}`;
+      showMessage(`[1/4] Storage アップロード開始...`);
       const { error: uploadErr } = await supabase.storage.from(BUCKET).upload(path, file);
-      if (uploadErr) { showMessage(`アップロード失敗: ${uploadErr.message}`); return; }
+      if (uploadErr) {
+        showMessage(`[Storage 失敗] ${uploadErr.message}`);
+        return;
+      }
+      showMessage(`[2/4] Storage 完了。DB insert 開始...`);
       const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(path);
       const mediaType: 'image' | 'video' = isVideo ? 'video' : 'image';
       const nextOrder = sectionMedia.length > 0
         ? Math.max(...sectionMedia.map(m => m.sort_order)) + 1
         : 0;
-      const { error: dbErr } = await supabase
+      const payload = {
+        section_id: sectionId,
+        media_url: publicUrl,
+        media_type: mediaType,
+        media_aspect: 'portrait',
+        media_position: 'center',
+        is_active: true,
+        sort_order: nextOrder,
+      };
+      console.log('[uploadSectionMedia] insert payload:', payload);
+      const { data: insertedData, error: dbErr } = await supabase
         .from('salon_lp_section_media')
-        .insert({
-          section_id: sectionId,
-          media_url: publicUrl,
-          media_type: mediaType,
-          media_aspect: 'video',
-          media_position: 'center',
-          is_active: true,
-          sort_order: nextOrder,
-        });
+        .insert(payload)
+        .select()
+        .single();
       if (dbErr) {
-        showMessage(`DB保存失敗: ${dbErr.message}`);
+        console.error('[uploadSectionMedia] insert error:', dbErr);
+        showMessage(`[DB 失敗] code:${dbErr.code} ${dbErr.message}${dbErr.hint ? ' hint:' + dbErr.hint : ''}${dbErr.details ? ' details:' + dbErr.details : ''}`);
         return;
       }
-      showMessage('メディアを追加しました');
+      console.log('[uploadSectionMedia] insert success:', insertedData);
+      showMessage(`[4/4] メディアを追加しました`);
       await loadSectionMedia(sectionId);
     } finally {
       setUploadingSectionMedia(false);
