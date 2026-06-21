@@ -211,6 +211,7 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
         sort_order: r.sort_order,
         sectionMedia: sectionMediaMap[r.id] ?? [],
       }));
+      console.log(`[SalonDetail:${slug}] lpSections sectionMedia:`, lpSections.map(s => `${s.section_type}:${s.sectionMedia.length}`).join(', '));
     }
 
     if (!slidesRes.error && slidesRes.data) {
