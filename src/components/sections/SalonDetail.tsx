@@ -354,8 +354,13 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
                     return (
                       <div key={m.id} className="aspect-[4/5] bg-stone-100 overflow-hidden relative">
                         {m.media_type === 'video' ? (
-                          <LazyAutoPlayVideo
+                          <video
                             src={m.media_url}
+                            autoPlay
+                            muted
+                            loop
+                            playsInline
+                            preload="metadata"
                             className={`w-full h-full object-cover ${pClass}`}
                           />
                         ) : (
@@ -397,8 +402,13 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
                 {hasMedia && (
                   <div className={`w-full sm:w-1/3 sm:max-w-[260px] shrink-0 ${aspectClass} bg-stone-100 overflow-hidden relative`}>
                     {sec.media_type === 'video' ? (
-                      <LazyAutoPlayVideo
+                      <video
                         src={sec.media_url!}
+                        autoPlay
+                        muted
+                        loop
+                        playsInline
+                        preload="metadata"
                         className={`w-full h-full object-cover ${positionClass}`}
                       />
                     ) : (
