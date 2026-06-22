@@ -3,7 +3,9 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { SITE } from '@/constants/site';
+import { getSalonBySlug } from '@/constants/salons';
 
 const NAV_LINKS = [
   { href: '/about', label: 'グループ紹介' },
@@ -14,8 +16,19 @@ const NAV_LINKS = [
   { href: '/recruit', label: '採用情報' },
 ];
 
+function useReservationUrl(): { url: string; external: boolean } {
+  const pathname = usePathname();
+  const match = pathname.match(/^\/salon\/([^/]+)/);
+  if (match) {
+    const salon = getSalonBySlug(match[1]);
+    if (salon?.hotpepperUrl) return { url: salon.hotpepperUrl, external: true };
+  }
+  return { url: '/reservation', external: false };
+}
+
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const { url: reservationUrl, external: reservationExternal } = useReservationUrl();
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 transition-all duration-500 bg-white/90 backdrop-blur-sm shadow-sm">
@@ -48,7 +61,8 @@ export default function Header() {
         {/* CTA + Hamburger */}
         <div className="flex items-center gap-3">
           <Link
-            href="/reservation"
+            href={reservationUrl}
+            {...(reservationExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
             className="hidden sm:inline-flex items-center px-5 py-2 text-xs tracking-widest bg-[#C9A96E] text-white hover:bg-[#b8964f] transition-colors"
           >
             ご予約
@@ -83,7 +97,8 @@ export default function Header() {
             ))}
             <div className="px-6 pt-3">
               <Link
-                href="/reservation"
+                href={reservationUrl}
+                {...(reservationExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
                 onClick={() => setMenuOpen(false)}
                 className="block text-center py-3 text-sm tracking-widest bg-[#C9A96E] text-white hover:bg-[#b8964f] transition-colors"
               >
