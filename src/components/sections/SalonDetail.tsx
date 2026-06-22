@@ -14,6 +14,7 @@ import SalonHeroSlider from '@/components/sections/SalonHeroSlider';
 import type { SalonHeroSlide } from '@/components/sections/SalonHeroSlider';
 import PickupSection from '@/components/sections/PickupSection';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import SalonFloatingCTA from '@/components/ui/SalonFloatingCTA';
 
 type SalonDetailProps = {
   slug: string;
@@ -69,6 +70,13 @@ function getPositionClass(position: string): string {
   if (position === 'right') return 'object-right';
   return 'object-center';
 }
+
+const SALON_FLOATING_NAME: Record<string, string> = {
+  labo: 'LABO by AHNKISM',
+  elu: 'ELU by AHNKISM',
+  nit: 'nit by AHNKISM',
+  olea: 'Olea by AHNKISM',
+};
 
 const SECTION_LABEL: Record<string, string> = {
   hero: 'Hero',
@@ -582,6 +590,14 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
         label={`${salon.name}を予約する`}
         sub="HotPepper Beauty からご予約いただけます"
         external
+      />
+
+      {/* スマホ固定予約ボタン用スペーサー */}
+      <div className="h-28 sm:h-0" aria-hidden="true" />
+
+      <SalonFloatingCTA
+        href={salon.hotpepperUrl || '/reservation'}
+        label={`${SALON_FLOATING_NAME[slug] ?? salon.name}を予約する`}
       />
     </>
   );
