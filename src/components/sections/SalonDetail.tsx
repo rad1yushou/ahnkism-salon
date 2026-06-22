@@ -9,6 +9,7 @@ import { getSalonBySlug, SALONS, type Salon } from '@/constants/salons';
 import { getStaffBySalon, type StaffMember } from '@/constants/staff';
 import StaffCard from '@/components/cards/StaffCard';
 import LazyAutoPlayVideo from '@/components/ui/LazyAutoPlayVideo';
+import VideoAutoPlay from '@/components/ui/VideoAutoPlay';
 import SalonHeroSlider from '@/components/sections/SalonHeroSlider';
 import type { SalonHeroSlide } from '@/components/sections/SalonHeroSlider';
 import PickupSection from '@/components/sections/PickupSection';
@@ -354,13 +355,8 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
                     return (
                       <div key={m.id} className="aspect-[4/5] bg-stone-100 overflow-hidden relative">
                         {m.media_type === 'video' ? (
-                          <video
+                          <VideoAutoPlay
                             src={m.media_url}
-                            autoPlay
-                            muted
-                            loop
-                            playsInline
-                            preload="metadata"
                             className={`w-full h-full object-cover ${pClass}`}
                           />
                         ) : (
@@ -402,13 +398,8 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
                 {hasMedia && (
                   <div className={`w-full sm:w-1/3 sm:max-w-[260px] shrink-0 ${aspectClass} bg-stone-100 overflow-hidden relative`}>
                     {sec.media_type === 'video' ? (
-                      <video
+                      <VideoAutoPlay
                         src={sec.media_url!}
-                        autoPlay
-                        muted
-                        loop
-                        playsInline
-                        preload="metadata"
                         className={`w-full h-full object-cover ${positionClass}`}
                       />
                     ) : (
