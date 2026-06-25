@@ -501,14 +501,35 @@ export default function AdminSalonLpPage() {
 
   const saveSectionMediaMeta = async (mediaId: string, sectionId: string) => {
     if (!supabase) return;
-    const { error } = await supabase
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      showMessage('セッションが切れています。ページを再読み込みしてログインし直してください。');
+      return;
+    }
+
+    console.log('[saveSectionMediaMeta] state before save:', JSON.stringify(sectionMediaMeta), 'mediaId:', mediaId);
+
+    const { data: updated, error } = await supabase
       .from('salon_lp_section_media')
       .update({
         title: sectionMediaMeta.title || null,
         description: sectionMediaMeta.description || null,
       })
-      .eq('id', mediaId);
-    if (error) { showMessage(`保存失敗: ${error.message}`); return; }
+      .eq('id', mediaId)
+      .select('id, title, description');
+
+    if (error) {
+      console.error('[saveSectionMediaMeta] error:', error);
+      showMessage(`保存失敗: ${error.message}`);
+      return;
+    }
+    if (!updated || updated.length === 0) {
+      console.error('[saveSectionMediaMeta] 0 rows updated – RLS or wrong id', { mediaId, session: session.user.email });
+      showMessage('保存できませんでした。権限またはRLSを確認してください');
+      return;
+    }
+    console.log('[saveSectionMediaMeta] saved:', updated[0]);
     showMessage('保存しました');
     setEditingSectionMediaId(null);
     await loadSectionMedia(sectionId);
