@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { connection } from 'next/server';
 import Image from 'next/image';
 import { buildSalonSchema } from '@/lib/schema';
 import JsonLd from '@/components/seo/JsonLd';
@@ -90,6 +91,7 @@ const SECTION_LABEL: Record<string, string> = {
 };
 
 export default async function SalonDetail({ slug }: SalonDetailProps) {
+  await connection(); // キャッシュを回避して毎リクエスト最新データを取得
   const constSalon = getSalonBySlug(slug);
   let salon: Salon | null = null;
   let salonLineUrl: string | null = null;

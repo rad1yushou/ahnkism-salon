@@ -4,7 +4,7 @@ import { getSalonBySlug } from '@/constants/salons';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import SalonDetail from '@/components/sections/SalonDetail';
 
-export const revalidate = 0;
+export const dynamic = 'force-dynamic';
 
 const SLUG = 'labo';
 
