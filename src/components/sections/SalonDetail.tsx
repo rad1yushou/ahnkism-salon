@@ -38,6 +38,8 @@ type SectionMedia = {
   media_aspect: string;
   media_position: string;
   sort_order: number;
+  title: string | null;
+  description: string | null;
 };
 
 type LpSection = {
@@ -187,7 +189,7 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
       if (sectionIds.length > 0) {
         const { data: smData, error: smError } = await supabase
           .from('salon_lp_section_media')
-          .select('id, section_id, media_url, media_type, media_aspect, media_position, sort_order')
+          .select('id, section_id, media_url, media_type, media_aspect, media_position, sort_order, title, description')
           .in('section_id', sectionIds)
           .eq('is_active', true)
           .order('sort_order', { ascending: true });
@@ -199,7 +201,11 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
           for (const m of smData) {
             const sid = (m as { section_id: string }).section_id;
             if (!sectionMediaMap[sid]) sectionMediaMap[sid] = [];
-            sectionMediaMap[sid].push(m as SectionMedia);
+            sectionMediaMap[sid].push({
+              ...(m as SectionMedia),
+              title: (m as { title?: string | null }).title ?? null,
+              description: (m as { description?: string | null }).description ?? null,
+            });
           }
         }
       }
@@ -360,21 +366,38 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-5">
                   {sec.sectionMedia.map((m, idx) => {
                     const pClass = getPositionClass(m.media_position);
+                    const hasText = !!(m.title || m.description);
                     return (
-                      <div key={m.id} className="aspect-[4/5] bg-stone-100 overflow-hidden relative">
-                        {m.media_type === 'video' ? (
-                          <VideoAutoPlay
-                            src={m.media_url}
-                            className={`w-full h-full object-cover ${pClass}`}
-                          />
-                        ) : (
-                          <Image
-                            src={m.media_url}
-                            alt={`${label} ${idx + 1}`}
-                            fill
-                            className={`object-cover ${pClass}`}
-                            unoptimized
-                          />
+                      <div key={m.id}>
+                        <div className="aspect-[4/5] bg-stone-100 overflow-hidden relative">
+                          {m.media_type === 'video' ? (
+                            <VideoAutoPlay
+                              src={m.media_url}
+                              className={`w-full h-full object-cover ${pClass}`}
+                            />
+                          ) : (
+                            <Image
+                              src={m.media_url}
+                              alt={m.title ?? `${label} ${idx + 1}`}
+                              fill
+                              className={`object-cover ${pClass}`}
+                              unoptimized
+                            />
+                          )}
+                        </div>
+                        {hasText && (
+                          <div className="mt-3">
+                            {m.title && (
+                              <p className="text-xs sm:text-sm font-light tracking-wider text-stone-800 mb-1">
+                                {m.title}
+                              </p>
+                            )}
+                            {m.description && (
+                              <p className="text-[11px] sm:text-xs text-stone-500 leading-relaxed">
+                                {m.description}
+                              </p>
+                            )}
+                          </div>
                         )}
                       </div>
                     );

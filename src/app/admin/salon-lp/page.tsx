@@ -100,6 +100,8 @@ type SectionMedia = {
   media_position: 'center' | 'top' | 'bottom' | 'left' | 'right';
   sort_order: number;
   is_active: boolean;
+  title: string | null;
+  description: string | null;
 };
 
 type SectionForm = {
@@ -138,6 +140,8 @@ export default function AdminSalonLpPage() {
   const [uploadingSectionMedia, setUploadingSectionMedia] = useState(false);
   const sectionMediaFileRef = useRef<HTMLInputElement>(null);
   const pendingSectionMedia = useRef<{ sectionId: string; sectionType: string } | null>(null);
+  const [editingSectionMediaId, setEditingSectionMediaId] = useState<string | null>(null);
+  const [sectionMediaMeta, setSectionMediaMeta] = useState<{ title: string; description: string }>({ title: '', description: '' });
 
   const [salonPickups, setSalonPickups] = useState<SalonPickup[]>([]);
   const [loadingPickups, setLoadingPickups] = useState(false);
@@ -227,7 +231,7 @@ export default function AdminSalonLpPage() {
     setLoadingSectionMedia(true);
     const { data, error } = await supabase
       .from('salon_lp_section_media')
-      .select('id, section_id, media_url, media_type, media_aspect, media_position, sort_order, is_active')
+      .select('id, section_id, media_url, media_type, media_aspect, media_position, sort_order, is_active, title, description')
       .eq('section_id', sectionId)
       .order('sort_order', { ascending: true });
     setLoadingSectionMedia(false);
@@ -246,6 +250,8 @@ export default function AdminSalonLpPage() {
       media_position: (r.media_position ?? 'center') as SectionMedia['media_position'],
       sort_order: r.sort_order,
       is_active: r.is_active,
+      title: (r as { title?: string | null }).title ?? null,
+      description: (r as { description?: string | null }).description ?? null,
     })));
   }, [supabase]);
 
@@ -490,6 +496,21 @@ export default function AdminSalonLpPage() {
   const updateSectionMediaField = async (mediaId: string, sectionId: string, field: 'media_aspect' | 'media_position', value: string) => {
     if (!supabase) return;
     await supabase.from('salon_lp_section_media').update({ [field]: value }).eq('id', mediaId);
+    await loadSectionMedia(sectionId);
+  };
+
+  const saveSectionMediaMeta = async (mediaId: string, sectionId: string) => {
+    if (!supabase) return;
+    const { error } = await supabase
+      .from('salon_lp_section_media')
+      .update({
+        title: sectionMediaMeta.title || null,
+        description: sectionMediaMeta.description || null,
+      })
+      .eq('id', mediaId);
+    if (error) { showMessage(`保存失敗: ${error.message}`); return; }
+    showMessage('保存しました');
+    setEditingSectionMediaId(null);
     await loadSectionMedia(sectionId);
   };
 
@@ -1013,58 +1034,124 @@ export default function AdminSalonLpPage() {
                             {sectionMedia.length === 0 && (
                               <p className="text-xs text-stone-400">メディアはまだありません</p>
                             )}
-                            {sectionMedia.map((m, mi) => (
-                              <div key={m.id} className="flex items-center gap-3 border border-stone-200 p-2 bg-white">
-                                <div className="w-16 h-10 bg-stone-100 overflow-hidden relative shrink-0">
-                                  {m.media_type === 'video' ? (
-                                    <video src={m.media_url} className="absolute inset-0 w-full h-full object-cover" muted playsInline />
-                                  ) : (
-                                    <img src={m.media_url} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                            {sectionMedia.map((m, mi) => {
+                              const isEditingMeta = editingSectionMediaId === m.id;
+                              return (
+                                <div key={m.id} className="border border-stone-200 bg-white">
+                                  {/* 行ヘッダー */}
+                                  <div className="flex items-center gap-3 p-2">
+                                    <div className="w-16 h-10 bg-stone-100 overflow-hidden relative shrink-0">
+                                      {m.media_type === 'video' ? (
+                                        <video src={m.media_url} className="absolute inset-0 w-full h-full object-cover" muted playsInline />
+                                      ) : (
+                                        <img src={m.media_url} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                                      )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex gap-2 mb-1">
+                                        <select
+                                          value={m.media_aspect}
+                                          onChange={e => updateSectionMediaField(m.id, sec.id, 'media_aspect', e.target.value)}
+                                          className="text-[10px] text-stone-600 border border-stone-200 px-2 py-0.5 focus:outline-none focus:border-stone-400"
+                                        >
+                                          <option value="video">16:9</option>
+                                          <option value="portrait">4:5</option>
+                                          <option value="square">1:1</option>
+                                          <option value="vertical">9:16</option>
+                                        </select>
+                                        <select
+                                          value={m.media_position}
+                                          onChange={e => updateSectionMediaField(m.id, sec.id, 'media_position', e.target.value)}
+                                          className="text-[10px] text-stone-600 border border-stone-200 px-2 py-0.5 focus:outline-none focus:border-stone-400"
+                                        >
+                                          <option value="center">中央</option>
+                                          <option value="top">上</option>
+                                          <option value="bottom">下</option>
+                                          <option value="left">左</option>
+                                          <option value="right">右</option>
+                                        </select>
+                                      </div>
+                                      {(m.title || m.description) && (
+                                        <p className="text-[10px] text-stone-400 truncate">{m.title ?? m.description}</p>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      <button type="button" onClick={() => moveSectionMedia(m.id, sec.id, 'up')} disabled={mi === 0} className="text-xs text-stone-400 hover:text-stone-700 disabled:opacity-20 px-1">↑</button>
+                                      <button type="button" onClick={() => moveSectionMedia(m.id, sec.id, 'down')} disabled={mi === sectionMedia.length - 1} className="text-xs text-stone-400 hover:text-stone-700 disabled:opacity-20 px-1">↓</button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          if (isEditingMeta) {
+                                            setEditingSectionMediaId(null);
+                                          } else {
+                                            setEditingSectionMediaId(m.id);
+                                            setSectionMediaMeta({ title: m.title ?? '', description: m.description ?? '' });
+                                          }
+                                        }}
+                                        className={`text-[10px] px-2 py-0.5 border transition-colors ${isEditingMeta ? 'bg-stone-800 text-white border-stone-800' : 'text-stone-500 border-stone-300 hover:border-stone-500'}`}
+                                      >
+                                        テキスト
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => toggleSectionMedia(m.id, sec.id, m.is_active)}
+                                        className={`text-[10px] px-2 py-0.5 border transition-colors ${m.is_active ? 'bg-stone-800 text-white border-stone-800' : 'text-stone-500 border-stone-300 hover:border-stone-500'}`}
+                                      >
+                                        {m.is_active ? '公開' : '非表示'}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => deleteSectionMedia(m.id, m.media_url, sec.id)}
+                                        className="text-[10px] text-red-400 border border-red-200 px-2 py-0.5 hover:border-red-400 transition-colors"
+                                      >
+                                        削除
+                                      </button>
+                                    </div>
+                                  </div>
+                                  {/* テキスト編集フォーム */}
+                                  {isEditingMeta && (
+                                    <div className="border-t border-stone-200 p-3 space-y-3 bg-stone-50">
+                                      <div>
+                                        <label className="block text-[10px] tracking-widest text-stone-500 mb-1">タイトル</label>
+                                        <input
+                                          type="text"
+                                          value={sectionMediaMeta.title}
+                                          onChange={e => setSectionMediaMeta(prev => ({ ...prev, title: e.target.value }))}
+                                          className="w-full text-xs text-stone-700 border border-stone-200 p-2 focus:outline-none focus:border-stone-400"
+                                          placeholder="例：最高峰髪質改善ストレート"
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="block text-[10px] tracking-widest text-stone-500 mb-1">説明文</label>
+                                        <textarea
+                                          value={sectionMediaMeta.description}
+                                          onChange={e => setSectionMediaMeta(prev => ({ ...prev, description: e.target.value }))}
+                                          rows={3}
+                                          className="w-full text-xs text-stone-700 border border-stone-200 p-2 leading-relaxed resize-y focus:outline-none focus:border-stone-400"
+                                          placeholder="例：癖や広がりを自然に整え、柔らかく艶のある髪へ導く髪質改善ストレートです。"
+                                        />
+                                      </div>
+                                      <div className="flex gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => saveSectionMediaMeta(m.id, sec.id)}
+                                          className="text-xs tracking-wider text-white bg-stone-800 px-5 py-1.5 hover:bg-stone-700 transition-colors"
+                                        >
+                                          保存する
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => setEditingSectionMediaId(null)}
+                                          className="text-xs tracking-wider text-stone-600 border border-stone-300 px-5 py-1.5 hover:border-stone-500 transition-colors"
+                                        >
+                                          キャンセル
+                                        </button>
+                                      </div>
+                                    </div>
                                   )}
                                 </div>
-                                <div className="flex-1 min-w-0 flex gap-2">
-                                  <select
-                                    value={m.media_aspect}
-                                    onChange={e => updateSectionMediaField(m.id, sec.id, 'media_aspect', e.target.value)}
-                                    className="text-[10px] text-stone-600 border border-stone-200 px-2 py-0.5 focus:outline-none focus:border-stone-400"
-                                  >
-                                    <option value="video">16:9</option>
-                                    <option value="portrait">4:5</option>
-                                    <option value="square">1:1</option>
-                                    <option value="vertical">9:16</option>
-                                  </select>
-                                  <select
-                                    value={m.media_position}
-                                    onChange={e => updateSectionMediaField(m.id, sec.id, 'media_position', e.target.value)}
-                                    className="text-[10px] text-stone-600 border border-stone-200 px-2 py-0.5 focus:outline-none focus:border-stone-400"
-                                  >
-                                    <option value="center">中央</option>
-                                    <option value="top">上</option>
-                                    <option value="bottom">下</option>
-                                    <option value="left">左</option>
-                                    <option value="right">右</option>
-                                  </select>
-                                </div>
-                                <div className="flex items-center gap-1 shrink-0">
-                                  <button type="button" onClick={() => moveSectionMedia(m.id, sec.id, 'up')} disabled={mi === 0} className="text-xs text-stone-400 hover:text-stone-700 disabled:opacity-20 px-1">↑</button>
-                                  <button type="button" onClick={() => moveSectionMedia(m.id, sec.id, 'down')} disabled={mi === sectionMedia.length - 1} className="text-xs text-stone-400 hover:text-stone-700 disabled:opacity-20 px-1">↓</button>
-                                  <button
-                                    type="button"
-                                    onClick={() => toggleSectionMedia(m.id, sec.id, m.is_active)}
-                                    className={`text-[10px] px-2 py-0.5 border transition-colors ${m.is_active ? 'bg-stone-800 text-white border-stone-800' : 'text-stone-500 border-stone-300 hover:border-stone-500'}`}
-                                  >
-                                    {m.is_active ? '公開' : '非表示'}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => deleteSectionMedia(m.id, m.media_url, sec.id)}
-                                    className="text-[10px] text-red-400 border border-red-200 px-2 py-0.5 hover:border-red-400 transition-colors"
-                                  >
-                                    削除
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         )}
                         <button
