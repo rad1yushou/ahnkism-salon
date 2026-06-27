@@ -25,6 +25,11 @@ const SECTION_LABELS: Record<string, string> = {
   before_after: 'Before / After',
 };
 
+// hero と intro 以外は複数メディア管理を表示（カスタムセクションも含む）
+function isMultiMediaSection(sectionType: string): boolean {
+  return sectionType !== 'hero' && sectionType !== 'intro';
+}
+
 function extractStoragePath(url: string): string | null {
   const marker = `/object/public/${BUCKET}/`;
   const idx = url.indexOf(marker);
@@ -142,6 +147,8 @@ export default function AdminSalonLpPage() {
   const pendingSectionMedia = useRef<{ sectionId: string; sectionType: string } | null>(null);
   const [editingSectionMediaId, setEditingSectionMediaId] = useState<string | null>(null);
   const [sectionMediaMeta, setSectionMediaMeta] = useState<{ title: string; description: string }>({ title: '', description: '' });
+  const [addingSection, setAddingSection] = useState(false);
+  const [newSectionForm, setNewSectionForm] = useState<{ title: string; body: string; is_active: boolean }>({ title: '', body: '', is_active: true });
 
   const [salonPickups, setSalonPickups] = useState<SalonPickup[]>([]);
   const [loadingPickups, setLoadingPickups] = useState(false);
@@ -264,12 +271,10 @@ export default function AdminSalonLpPage() {
     loadPickups(selectedSlug);
   }, [loadSections, loadSlides, loadPickups, selectedSlug]);
 
-  const MULTI_MEDIA_TYPES = new Set(['atmosphere', 'technique', 'staff_vibe', 'before_after']);
-
   useEffect(() => {
     if (editingId) {
       const sec = sections.find(s => s.id === editingId);
-      if (sec && MULTI_MEDIA_TYPES.has(sec.section_type)) {
+      if (sec && isMultiMediaSection(sec.section_type)) {
         loadSectionMedia(editingId);
       } else {
         setSectionMedia([]);
@@ -698,6 +703,40 @@ export default function AdminSalonLpPage() {
     await loadPickups(selectedSlug);
   };
 
+  const createSection = async () => {
+    if (!supabase) return;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { showMessage('セッションが切れています。再読み込みしてください。'); return; }
+    const nextOrder = sections.length > 0 ? Math.max(...sections.map(s => s.sort_order)) + 1 : 10;
+    const sectionType = `custom_${Date.now()}`;
+    const { error } = await supabase
+      .from('salon_lp_sections')
+      .insert({
+        salon_slug: selectedSlug,
+        section_type: sectionType,
+        title: newSectionForm.title || '',
+        body: newSectionForm.body || '',
+        is_active: newSectionForm.is_active,
+        sort_order: nextOrder,
+        layout_type: 'detail',
+      });
+    if (error) { showMessage(`追加失敗: ${error.message}`); return; }
+    showMessage('セクションを追加しました');
+    setAddingSection(false);
+    setNewSectionForm({ title: '', body: '', is_active: true });
+    await loadSections(selectedSlug);
+  };
+
+  const toggleSection = async (sec: LpSection) => {
+    if (!supabase) return;
+    const { error } = await supabase
+      .from('salon_lp_sections')
+      .update({ is_active: !sec.is_active })
+      .eq('id', sec.id);
+    if (error) { showMessage(`更新失敗: ${error.message}`); return; }
+    await loadSections(selectedSlug);
+  };
+
   if (!isConfigured) {
     return <div className="text-xs text-stone-400 tracking-wider">Supabase が設定されていません</div>;
   }
@@ -789,18 +828,23 @@ export default function AdminSalonLpPage() {
         <div className="space-y-4">
           {sections.map((sec, i) => {
             const isEditing = editingId === sec.id;
-            const label = SECTION_LABELS[sec.section_type] ?? sec.section_type;
+            const label = SECTION_LABELS[sec.section_type] ?? 'カスタム';
             const isUploading = uploading && uploadingId === sec.id;
 
             return (
-              <div key={sec.id} className="border border-stone-200">
+              <div key={sec.id} className={`border ${sec.is_active ? 'border-stone-200' : 'border-stone-100 opacity-60'}`}>
                 {/* ヘッダー行 */}
                 <div className="flex items-center gap-3 px-4 py-3">
-                  <span className={`text-[10px] px-2 py-0.5 shrink-0 ${sec.is_active ? 'bg-stone-800 text-white' : 'bg-stone-200 text-stone-500'}`}>
-                    {sec.is_active ? '公開' : '非表示'}
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() => toggleSection(sec)}
+                    className={`text-[10px] px-2 py-0.5 shrink-0 border transition-colors ${sec.is_active ? 'bg-stone-800 text-white border-stone-800 hover:bg-stone-700' : 'bg-stone-100 text-stone-500 border-stone-300 hover:border-stone-500'}`}
+                    title={sec.is_active ? 'クリックで非掲載にする' : 'クリックで公開にする'}
+                  >
+                    {sec.is_active ? '公開' : '非掲載'}
+                  </button>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs text-stone-400 tracking-wider">{label}</p>
+                    <p className="text-[10px] text-stone-400 tracking-wider">{label}</p>
                     {sec.title && (
                       <p className="text-sm text-stone-700 font-light truncate">{sec.title}</p>
                     )}
@@ -1043,8 +1087,8 @@ export default function AdminSalonLpPage() {
                       </div>
                     )}
 
-                    {/* 複数メディア管理（atmosphere / technique / staff_vibe / before_after） */}
-                    {MULTI_MEDIA_TYPES.has(sec.section_type) && (
+                    {/* 複数メディア管理（hero・intro 以外の全セクション） */}
+                    {isMultiMediaSection(sec.section_type) && (
                       <div className="border-t border-stone-200 pt-5">
                         <p className="text-[10px] tracking-widest text-stone-500 mb-1">複数メディア管理</p>
                         <p className="text-[10px] text-stone-400 mb-3">メディアが0件の場合は上記「画像 / 動画」がフォールバックとして表示されます</p>
@@ -1228,6 +1272,69 @@ export default function AdminSalonLpPage() {
           })}
         </div>
       )}
+      {/* ── セクション追加 ── */}
+      <div className="mt-6 mb-10">
+        {!addingSection ? (
+          <button
+            type="button"
+            onClick={() => setAddingSection(true)}
+            className="text-xs tracking-wider text-stone-600 border border-stone-300 px-5 py-2 hover:border-stone-500 transition-colors"
+          >
+            + セクションを追加
+          </button>
+        ) : (
+          <div className="border border-stone-200 p-5 space-y-4 bg-stone-50">
+            <p className="text-xs font-medium text-stone-700 tracking-wider">新規セクション</p>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={newSectionForm.is_active}
+                onChange={e => setNewSectionForm(prev => ({ ...prev, is_active: e.target.checked }))}
+                className="accent-stone-600"
+              />
+              <span className="text-xs text-stone-600 tracking-wider">公開する</span>
+            </label>
+            <div>
+              <label className="block text-[10px] tracking-widest text-stone-500 mb-2">見出し（タイトル）</label>
+              <input
+                type="text"
+                value={newSectionForm.title}
+                onChange={e => setNewSectionForm(prev => ({ ...prev, title: e.target.value }))}
+                className="w-full text-xs text-stone-700 border border-stone-200 p-2 focus:outline-none focus:border-stone-400"
+                placeholder="例：髪質改善ストレート"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] tracking-widest text-stone-500 mb-2">本文</label>
+              <textarea
+                value={newSectionForm.body}
+                onChange={e => setNewSectionForm(prev => ({ ...prev, body: e.target.value }))}
+                rows={3}
+                className="w-full text-xs text-stone-700 border border-stone-200 p-2 leading-relaxed resize-y focus:outline-none focus:border-stone-400"
+                placeholder="セクションの説明文（省略可）"
+              />
+            </div>
+            <p className="text-[10px] text-stone-400">保存後に「編集」ボタンから画像・動画を追加できます</p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={createSection}
+                className="text-xs tracking-wider text-white bg-stone-800 px-6 py-2 hover:bg-stone-700 transition-colors"
+              >
+                追加する
+              </button>
+              <button
+                type="button"
+                onClick={() => { setAddingSection(false); setNewSectionForm({ title: '', body: '', is_active: true }); }}
+                className="text-xs tracking-wider text-stone-600 border border-stone-300 px-6 py-2 hover:border-stone-500 transition-colors"
+              >
+                キャンセル
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* ── 店舗ピックアップ管理 ── */}
       <div className="mt-10">
         <div className="mb-4">

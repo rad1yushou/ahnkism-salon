@@ -90,6 +90,11 @@ const SECTION_LABEL: Record<string, string> = {
   before_after: 'Before / After',
 };
 
+// hero と intro 以外は複数メディアグリッド表示を行う（カスタムセクションも含む）
+function isMultiMediaSection(sectionType: string): boolean {
+  return sectionType !== 'hero' && sectionType !== 'intro';
+}
+
 export default async function SalonDetail({ slug }: SalonDetailProps) {
   await connection(); // キャッシュを回避して毎リクエスト最新データを取得
   const constSalon = getSalonBySlug(slug);
@@ -345,10 +350,10 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
 
       {/* ── LP セクション ── */}
       {nonHeroSections.map((sec, i) => {
-        const label = SECTION_LABEL[sec.section_type] ?? sec.section_type;
+        const label = SECTION_LABEL[sec.section_type] ?? sec.title;
 
-        // 複数メディアが登録されている場合はグリッド表示（before_after / atmosphere / technique / staff_vibe）
-        if (sec.sectionMedia.length > 0) {
+        // 複数メディアが登録されている場合はグリッド表示
+        if (sec.sectionMedia.length > 0 && isMultiMediaSection(sec.section_type)) {
           return (
             <section key={sec.id} className="py-16 sm:py-20 border-t border-stone-100">
               <Container>
