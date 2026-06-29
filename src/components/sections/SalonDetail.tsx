@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { connection } from 'next/server';
 import Image from 'next/image';
+import Link from 'next/link';
 import { buildSalonSchema } from '@/lib/schema';
 import JsonLd from '@/components/seo/JsonLd';
 import Breadcrumb from '@/components/seo/Breadcrumb';
@@ -19,6 +20,16 @@ import SalonFloatingCTA from '@/components/ui/SalonFloatingCTA';
 
 type SalonDetailProps = {
   slug: string;
+};
+
+type RecentBlog = {
+  id: string;
+  title: string;
+  slug: string;
+  excerpt: string | null;
+  featured_image_url: string | null;
+  category: string | null;
+  published_at: string | null;
 };
 
 type SalonMenu = {
@@ -104,10 +115,11 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
   let staff: StaffMember[] = getStaffBySalon(slug);
   let lpSections: LpSection[] = [];
   let heroSlides: SalonHeroSlide[] = [];
+  let recentBlogs: RecentBlog[] = [];
 
   const supabase = await createSupabaseServerClient();
   if (supabase) {
-    const [salonRes, menusRes, staffRes, lpRes, slidesRes] = await Promise.all([
+    const [salonRes, menusRes, staffRes, lpRes, slidesRes, blogsRes] = await Promise.all([
       supabase
         .from('salons')
         .select('slug, name, short_name, description, address, address_postal, address_locality, tel, hours, hours_note, nearest_station, latitude, longitude, google_map_url, hotpepper_url, instagram_url, line_url, image_url')
@@ -137,6 +149,13 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
         .eq('salon_slug', slug)
         .eq('is_active', true)
         .order('sort_order', { ascending: true }),
+      supabase
+        .from('salon_blogs')
+        .select('id, title, slug, excerpt, featured_image_url, category, published_at')
+        .eq('salon_slug', slug)
+        .eq('is_published', true)
+        .order('published_at', { ascending: false })
+        .limit(3),
     ]);
 
     if (!salonRes.error && salonRes.data) {
@@ -241,6 +260,10 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
         media_url: s.media_url as string,
         media_type: s.media_type as string | null,
       }));
+    }
+
+    if (!blogsRes.error && blogsRes.data) {
+      recentBlogs = blogsRes.data as RecentBlog[];
     }
   }
 
@@ -536,6 +559,64 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
               {staff.map((m) => (
                 <StaffCard key={m.slug} member={m} />
               ))}
+            </div>
+          </Container>
+        </section>
+      )}
+
+      {/* ── ブログ ── */}
+      {recentBlogs.length > 0 && (
+        <section className="py-16 sm:py-20 border-t border-stone-100">
+          <Container>
+            <p className="text-[10px] tracking-[0.3em] text-[#C9A96E] uppercase mb-3 text-center">Blog</p>
+            <h2 className="text-xl font-light tracking-wider text-stone-800 mb-10 text-center">
+              最新ブログ
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+              {recentBlogs.map((blog) => (
+                <Link
+                  key={blog.id}
+                  href={`/salon/${slug}/blog/${blog.slug}`}
+                  className="group block"
+                >
+                  <div className="aspect-video bg-stone-100 overflow-hidden relative mb-3">
+                    {blog.featured_image_url ? (
+                      <Image
+                        src={blog.featured_image_url}
+                        alt={blog.title}
+                        fill
+                        className="object-cover group-hover:scale-105 transition-transform duration-300"
+                        unoptimized
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-stone-300 text-xs tracking-widest">
+                        PHOTO
+                      </div>
+                    )}
+                  </div>
+                  {blog.category && (
+                    <p className="text-[10px] tracking-widest text-[#C9A96E] mb-1 uppercase">
+                      {blog.category}
+                    </p>
+                  )}
+                  <p className="text-sm font-light tracking-wider text-stone-800 group-hover:text-[#C9A96E] transition-colors line-clamp-2">
+                    {blog.title}
+                  </p>
+                  {blog.published_at && (
+                    <p className="text-[10px] text-stone-400 mt-1">
+                      {new Date(blog.published_at).toLocaleDateString('ja-JP')}
+                    </p>
+                  )}
+                </Link>
+              ))}
+            </div>
+            <div className="mt-8 text-center">
+              <Link
+                href={`/salon/${slug}/blog`}
+                className="text-xs tracking-widest text-stone-500 border-b border-stone-300 pb-0.5 hover:text-[#C9A96E] hover:border-[#C9A96E] transition-colors"
+              >
+                ブログ一覧を見る →
+              </Link>
             </div>
           </Container>
         </section>
