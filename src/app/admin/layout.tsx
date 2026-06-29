@@ -28,7 +28,6 @@ const FALLBACK_NAV: NavItem[] = [
   { href: '/admin/reviews',       label: '口コミ管理',     icon: '✦' },
   { href: '/admin/recruit',       label: '採用管理',       icon: '✉' },
   { href: '/admin/about',         label: 'グループ紹介',   icon: '✦' },
-  { href: '/admin/blogs',         label: 'ブログ管理',     icon: '✍' },
   { href: '/admin/nav',           label: '管理メニュー',   icon: '⚙' },
 ];
 
