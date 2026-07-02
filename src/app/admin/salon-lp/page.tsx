@@ -860,6 +860,7 @@ export default function AdminSalonLpPage() {
     const publishedAt = toIso(newBlogForm.published_at) ?? (newBlogForm.is_published ? new Date().toISOString() : null);
     const payload = {
       salon_slug: selectedSlug,
+      slug: `blog-${Date.now()}`,
       title: newBlogForm.title.trim(),
       category: newBlogForm.category || null,
       author_name: newBlogForm.author_name || null,
