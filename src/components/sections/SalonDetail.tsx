@@ -90,6 +90,16 @@ const SECTION_LABEL: Record<string, string> = {
   before_after: 'Before / After',
 };
 
+type RecentBlog = {
+  id: string;
+  title: string;
+  category: string | null;
+  author_name: string | null;
+  excerpt: string | null;
+  featured_image_url: string | null;
+  published_at: string | null;
+};
+
 // hero と intro 以外は複数メディアグリッド表示を行う（カスタムセクションも含む）
 function isMultiMediaSection(sectionType: string): boolean {
   return sectionType !== 'hero' && sectionType !== 'intro';
@@ -104,10 +114,11 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
   let staff: StaffMember[] = getStaffBySalon(slug);
   let lpSections: LpSection[] = [];
   let heroSlides: SalonHeroSlide[] = [];
+  let recentBlogs: RecentBlog[] = [];
 
   const supabase = await createSupabaseServerClient();
   if (supabase) {
-    const [salonRes, menusRes, staffRes, lpRes, slidesRes] = await Promise.all([
+    const [salonRes, menusRes, staffRes, lpRes, slidesRes, blogsRes] = await Promise.all([
       supabase
         .from('salons')
         .select('slug, name, short_name, description, address, address_postal, address_locality, tel, hours, hours_note, nearest_station, latitude, longitude, google_map_url, hotpepper_url, instagram_url, line_url, image_url')
@@ -137,6 +148,13 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
         .eq('salon_slug', slug)
         .eq('is_active', true)
         .order('sort_order', { ascending: true }),
+      supabase
+        .from('salon_blogs')
+        .select('id, title, category, author_name, excerpt, featured_image_url, published_at')
+        .eq('salon_slug', slug)
+        .eq('is_published', true)
+        .order('published_at', { ascending: false })
+        .limit(6),
     ]);
 
     if (!salonRes.error && salonRes.data) {
@@ -241,6 +259,10 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
         media_url: s.media_url as string,
         media_type: s.media_type as string | null,
       }));
+    }
+
+    if (!blogsRes.error && blogsRes.data) {
+      recentBlogs = blogsRes.data as RecentBlog[];
     }
   }
 
@@ -535,6 +557,52 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
               {staff.map((m) => (
                 <StaffCard key={m.slug} member={m} />
+              ))}
+            </div>
+          </Container>
+        </section>
+      )}
+
+      {/* ── ブログ ── */}
+      {recentBlogs.length > 0 && (
+        <section className="py-16 sm:py-20 border-t border-stone-100">
+          <Container>
+            <p className="text-[10px] tracking-[0.3em] text-[#C9A96E] uppercase mb-3 text-center">Blog</p>
+            <h2 className="text-xl font-light tracking-wider text-stone-800 mb-10 text-center">ブログ</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {recentBlogs.map(blog => (
+                <article key={blog.id} className="border border-stone-100">
+                  {blog.featured_image_url && (
+                    <div className="aspect-[4/3] overflow-hidden">
+                      <Image
+                        src={blog.featured_image_url}
+                        alt={blog.title}
+                        width={600}
+                        height={450}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  )}
+                  <div className="p-4">
+                    {blog.category && (
+                      <p className="text-[10px] tracking-[0.2em] text-[#C9A96E] uppercase mb-1">{blog.category}</p>
+                    )}
+                    <h3 className="text-sm font-light tracking-wider text-stone-800 leading-relaxed mb-2">{blog.title}</h3>
+                    {blog.excerpt && (
+                      <p className="text-[11px] text-stone-500 leading-relaxed line-clamp-3">{blog.excerpt}</p>
+                    )}
+                    <div className="mt-3 flex items-center justify-between">
+                      {blog.author_name && (
+                        <span className="text-[10px] text-stone-400">{blog.author_name}</span>
+                      )}
+                      {blog.published_at && (
+                        <time className="text-[10px] text-stone-400 ml-auto" dateTime={blog.published_at}>
+                          {new Date(blog.published_at).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}
+                        </time>
+                      )}
+                    </div>
+                  </div>
+                </article>
               ))}
             </div>
           </Container>
