@@ -844,35 +844,48 @@ export default function AdminSalonLpPage() {
   };
 
   // ── ブログ操作 ─────────────────────────────────────────────
+  const toIso = (datetimeLocal: string): string | null => {
+    if (!datetimeLocal) return null;
+    const d = new Date(datetimeLocal);
+    return isNaN(d.getTime()) ? null : d.toISOString();
+  };
+
   const createBlog = async () => {
-    if (!supabase) return;
-    const { session } = (await supabase.auth.getSession()).data;
-    if (!session) { showMessage('セッションが切れています。再ログインしてください'); return; }
+    console.log('[createBlog] called, selectedSlug:', selectedSlug, 'title:', newBlogForm.title);
+    if (!supabase) { showMessage('Supabase未設定'); return; }
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    console.log('[createBlog] session:', sessionData?.session?.user?.email, 'sessionError:', sessionError);
+    if (!sessionData?.session) { showMessage('セッションが切れています。再ログインしてください'); return; }
     if (!newBlogForm.title.trim()) { showMessage('タイトルを入力してください'); return; }
+    const publishedAt = toIso(newBlogForm.published_at) ?? (newBlogForm.is_published ? new Date().toISOString() : null);
+    const payload = {
+      salon_slug: selectedSlug,
+      title: newBlogForm.title.trim(),
+      category: newBlogForm.category || null,
+      author_name: newBlogForm.author_name || null,
+      excerpt: newBlogForm.excerpt || null,
+      body: newBlogForm.body || null,
+      featured_image_url: newBlogForm.featured_image_url,
+      is_published: newBlogForm.is_published,
+      published_at: publishedAt,
+      sort_order: newBlogForm.sort_order,
+    };
+    console.log('[createBlog] insert payload:', payload);
     setSavingBlog(true);
     try {
-      const { data, error } = await supabase.from('salon_blogs').insert({
-        salon_slug: selectedSlug,
-        title: newBlogForm.title.trim(),
-        category: newBlogForm.category || null,
-        author_name: newBlogForm.author_name || null,
-        excerpt: newBlogForm.excerpt || null,
-        body: newBlogForm.body || null,
-        featured_image_url: newBlogForm.featured_image_url,
-        is_published: newBlogForm.is_published,
-        published_at: newBlogForm.published_at || (newBlogForm.is_published ? new Date().toISOString() : null),
-        sort_order: newBlogForm.sort_order,
-      }).select('id').single();
-      if (error) { showMessage(`作成失敗: ${error.message}`); return; }
-      showMessage('ブログを作成しました');
+      const { data, error } = await supabase.from('salon_blogs').insert(payload).select('id').single();
+      console.log('[createBlog] insert result - data:', data, 'error:', error);
+      if (error) { showMessage(`作成失敗: ${error.message} (code: ${error.code})`); return; }
+      showMessage(`ブログを作成しました (id: ${data?.id?.slice(0, 8)})`);
       setAddingBlog(false);
       setNewBlogForm({ ...EMPTY_BLOG_FORM });
       await loadBlogs(selectedSlug);
       if (data?.id) {
-        const { data: blog } = await supabase.from('salon_blogs').select('*').eq('id', data.id).single();
+        const { data: blog, error: fetchErr } = await supabase.from('salon_blogs').select('*').eq('id', data.id).single();
+        console.log('[createBlog] fetch after insert - blog:', blog, 'fetchErr:', fetchErr);
         if (blog) {
           setEditingBlogId(blog.id);
-          setBlogForm({ title: blog.title, category: blog.category ?? '', author_name: blog.author_name ?? '', excerpt: blog.excerpt ?? '', body: blog.body ?? '', featured_image_url: blog.featured_image_url, is_published: blog.is_published, published_at: blog.published_at ?? '', sort_order: blog.sort_order });
+          setBlogForm({ title: blog.title, category: blog.category ?? '', author_name: blog.author_name ?? '', excerpt: blog.excerpt ?? '', body: blog.body ?? '', featured_image_url: blog.featured_image_url, is_published: blog.is_published, published_at: blog.published_at ? blog.published_at.slice(0, 16) : '', sort_order: blog.sort_order });
         }
       }
     } finally { setSavingBlog(false); }
@@ -892,7 +905,7 @@ export default function AdminSalonLpPage() {
         body: blogForm.body || null,
         featured_image_url: blogForm.featured_image_url,
         is_published: blogForm.is_published,
-        published_at: blogForm.published_at || (blogForm.is_published ? new Date().toISOString() : null),
+        published_at: toIso(blogForm.published_at) ?? (blogForm.is_published ? new Date().toISOString() : null),
         sort_order: blogForm.sort_order,
         updated_at: new Date().toISOString(),
       }).eq('id', editingBlogId);
