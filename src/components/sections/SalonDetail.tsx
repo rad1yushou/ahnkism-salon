@@ -577,48 +577,39 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
 
       {/* ── ブログ ── */}
       {recentBlogs.length > 0 && (
-        <section className="py-10 sm:py-14 border-t border-stone-100">
+        <section className="py-8 sm:py-10 border-t border-stone-100">
           <Container>
-            <p className="text-[10px] tracking-[0.3em] text-[#C9A96E] uppercase mb-2 text-center">Blog</p>
-            <h2 className="text-xl font-light tracking-wider text-stone-800 mb-8 text-center">ブログ</h2>
-            <div className="max-w-2xl mx-auto divide-y divide-stone-100">
-              {recentBlogs.map(blog => (
-                <article key={blog.id} className="flex gap-4 py-4">
-                  {/* サムネイル */}
-                  {blog.featured_image_url ? (
-                    <div className="shrink-0 w-24 sm:w-28">
+            <p className="text-[9px] tracking-[0.3em] text-[#C9A96E] uppercase mb-1.5 text-center">Blog</p>
+            <h2 className="text-sm font-light tracking-wider text-stone-800 mb-4 text-center">ブログ</h2>
+            <div className="max-w-2xl mx-auto">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {recentBlogs.map(blog => (
+                  <article key={blog.id} className="border border-stone-100">
+                    {blog.featured_image_url && (
                       <div className={`${blogAspectClass(blog.featured_image_aspect)} overflow-hidden`}>
                         <Image
                           src={blog.featured_image_url}
                           alt={blog.title}
-                          width={120}
-                          height={90}
+                          width={300}
+                          height={225}
                           className="w-full h-full object-cover"
                         />
                       </div>
+                    )}
+                    <div className="p-1.5">
+                      {blog.category && (
+                        <p className="text-[8px] tracking-[0.15em] text-[#C9A96E] uppercase mb-0.5">{blog.category}</p>
+                      )}
+                      <h3 className="text-[10px] font-light text-stone-800 leading-snug line-clamp-2">{blog.title}</h3>
+                      {blog.published_at && (
+                        <time className="block text-[8px] text-stone-300 mt-1" dateTime={blog.published_at}>
+                          {new Date(blog.published_at).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' })}
+                        </time>
+                      )}
                     </div>
-                  ) : (
-                    <div className="shrink-0 w-24 sm:w-28 aspect-[4/3] bg-stone-50 flex items-center justify-center">
-                      <span className="text-[9px] text-stone-300 tracking-widest">NO IMAGE</span>
-                    </div>
-                  )}
-                  {/* テキスト */}
-                  <div className="flex-1 min-w-0 py-0.5">
-                    {blog.category && (
-                      <p className="text-[9px] tracking-[0.2em] text-[#C9A96E] uppercase mb-1">{blog.category}</p>
-                    )}
-                    <h3 className="text-sm font-light tracking-wide text-stone-800 leading-snug mb-1.5">{blog.title}</h3>
-                    {blog.excerpt && (
-                      <p className="text-[11px] text-stone-400 leading-relaxed line-clamp-2">{blog.excerpt}</p>
-                    )}
-                    {blog.published_at && (
-                      <time className="block text-[9px] text-stone-300 mt-2" dateTime={blog.published_at}>
-                        {new Date(blog.published_at).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}
-                      </time>
-                    )}
-                  </div>
-                </article>
-              ))}
+                  </article>
+                ))}
+              </div>
             </div>
           </Container>
         </section>
