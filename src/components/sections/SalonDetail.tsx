@@ -577,11 +577,11 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
 
       {/* ── ブログ ── */}
       {recentBlogs.length > 0 && (
-        <section className="py-16 sm:py-20 border-t border-stone-100">
+        <section className="py-10 sm:py-14 border-t border-stone-100">
           <Container>
-            <p className="text-[10px] tracking-[0.3em] text-[#C9A96E] uppercase mb-3 text-center">Blog</p>
-            <h2 className="text-xl font-light tracking-wider text-stone-800 mb-10 text-center">ブログ</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <p className="text-[10px] tracking-[0.3em] text-[#C9A96E] uppercase mb-2 text-center">Blog</p>
+            <h2 className="text-lg font-light tracking-wider text-stone-800 mb-6 text-center">ブログ</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
               {recentBlogs.map(blog => (
                 <article key={blog.id} className="border border-stone-100">
                   {blog.featured_image_url && (
@@ -589,30 +589,25 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
                       <Image
                         src={blog.featured_image_url}
                         alt={blog.title}
-                        width={600}
-                        height={450}
+                        width={400}
+                        height={300}
                         className="w-full h-full object-cover"
                       />
                     </div>
                   )}
-                  <div className="p-4">
+                  <div className="p-2.5">
                     {blog.category && (
-                      <p className="text-[10px] tracking-[0.2em] text-[#C9A96E] uppercase mb-1">{blog.category}</p>
+                      <p className="text-[9px] tracking-[0.2em] text-[#C9A96E] uppercase mb-0.5">{blog.category}</p>
                     )}
-                    <h3 className="text-sm font-light tracking-wider text-stone-800 leading-relaxed mb-2">{blog.title}</h3>
+                    <h3 className="text-[11px] font-light tracking-wide text-stone-800 leading-snug mb-1 line-clamp-2">{blog.title}</h3>
                     {blog.excerpt && (
-                      <p className="text-[11px] text-stone-500 leading-relaxed line-clamp-3">{blog.excerpt}</p>
+                      <p className="text-[10px] text-stone-400 leading-relaxed line-clamp-2">{blog.excerpt}</p>
                     )}
-                    <div className="mt-3 flex items-center justify-between">
-                      {blog.author_name && (
-                        <span className="text-[10px] text-stone-400">{blog.author_name}</span>
-                      )}
-                      {blog.published_at && (
-                        <time className="text-[10px] text-stone-400 ml-auto" dateTime={blog.published_at}>
-                          {new Date(blog.published_at).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}
-                        </time>
-                      )}
-                    </div>
+                    {blog.published_at && (
+                      <time className="block text-[9px] text-stone-300 mt-1.5" dateTime={blog.published_at}>
+                        {new Date(blog.published_at).toLocaleDateString('ja-JP', { year: 'numeric', month: 'short', day: 'numeric' })}
+                      </time>
+                    )}
                   </div>
                 </article>
               ))}
