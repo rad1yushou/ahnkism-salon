@@ -36,6 +36,7 @@ type Blog = {
   excerpt: string | null;
   body: string | null;
   featured_image_url: string | null;
+  featured_image_aspect: string;
   is_published: boolean;
   published_at: string | null;
   sort_order: number;
@@ -51,6 +52,7 @@ type BlogMedia = {
   alt: string | null;
   sort_order: number;
   is_active: boolean;
+  media_aspect: string;
 };
 
 type BlogForm = {
@@ -60,10 +62,13 @@ type BlogForm = {
   excerpt: string;
   body: string;
   featured_image_url: string | null;
+  featured_image_aspect: string;
   is_published: boolean;
   published_at: string;
   sort_order: number;
 };
+
+const BLOG_ASPECT_OPTIONS = ['4:3', '3:4', '1:1', '16:9', '9:16'] as const;
 
 const EMPTY_BLOG_FORM: BlogForm = {
   title: '',
@@ -72,6 +77,7 @@ const EMPTY_BLOG_FORM: BlogForm = {
   excerpt: '',
   body: '',
   featured_image_url: null,
+  featured_image_aspect: '4:3',
   is_published: false,
   published_at: '',
   sort_order: 0,
@@ -222,7 +228,7 @@ export default function AdminSalonLpPage() {
   const [loadingBlogMedia, setLoadingBlogMedia] = useState(false);
   const [uploadingBlogMedia, setUploadingBlogMedia] = useState(false);
   const [editingBlogMediaId, setEditingBlogMediaId] = useState<string | null>(null);
-  const [blogMediaMeta, setBlogMediaMeta] = useState<{ title: string; description: string; alt: string; sort_order: number }>({ title: '', description: '', alt: '', sort_order: 0 });
+  const [blogMediaMeta, setBlogMediaMeta] = useState<{ title: string; description: string; alt: string; sort_order: number; media_aspect: string }>({ title: '', description: '', alt: '', sort_order: 0, media_aspect: '4:3' });
   const blogImageRef = useRef<HTMLInputElement>(null);
   const blogMediaFileRef = useRef<HTMLInputElement>(null);
 
@@ -336,7 +342,7 @@ export default function AdminSalonLpPage() {
     setLoadingBlogs(true);
     const { data, error } = await supabase
       .from('salon_blogs')
-      .select('id, salon_slug, title, category, author_name, excerpt, body, featured_image_url, is_published, published_at, sort_order, created_at')
+      .select('id, salon_slug, title, category, author_name, excerpt, body, featured_image_url, featured_image_aspect, is_published, published_at, sort_order, created_at')
       .eq('salon_slug', slug)
       .order('sort_order', { ascending: true })
       .order('created_at', { ascending: false });
@@ -350,7 +356,7 @@ export default function AdminSalonLpPage() {
     setLoadingBlogMedia(true);
     const { data } = await supabase
       .from('salon_blog_media')
-      .select('id, blog_id, media_url, title, description, alt, sort_order, is_active')
+      .select('id, blog_id, media_url, title, description, alt, sort_order, is_active, media_aspect')
       .eq('blog_id', blogId)
       .order('sort_order', { ascending: true });
     setBlogMedia((data ?? []) as BlogMedia[]);
@@ -867,6 +873,7 @@ export default function AdminSalonLpPage() {
       excerpt: newBlogForm.excerpt || null,
       body: newBlogForm.body || null,
       featured_image_url: newBlogForm.featured_image_url,
+      featured_image_aspect: newBlogForm.featured_image_aspect,
       is_published: newBlogForm.is_published,
       published_at: publishedAt,
       sort_order: newBlogForm.sort_order,
@@ -886,7 +893,7 @@ export default function AdminSalonLpPage() {
         console.log('[createBlog] fetch after insert - blog:', blog, 'fetchErr:', fetchErr);
         if (blog) {
           setEditingBlogId(blog.id);
-          setBlogForm({ title: blog.title, category: blog.category ?? '', author_name: blog.author_name ?? '', excerpt: blog.excerpt ?? '', body: blog.body ?? '', featured_image_url: blog.featured_image_url, is_published: blog.is_published, published_at: blog.published_at ? blog.published_at.slice(0, 16) : '', sort_order: blog.sort_order });
+          setBlogForm({ title: blog.title, category: blog.category ?? '', author_name: blog.author_name ?? '', excerpt: blog.excerpt ?? '', body: blog.body ?? '', featured_image_url: blog.featured_image_url, featured_image_aspect: blog.featured_image_aspect ?? '4:3', is_published: blog.is_published, published_at: blog.published_at ? blog.published_at.slice(0, 16) : '', sort_order: blog.sort_order });
         }
       }
     } finally { setSavingBlog(false); }
@@ -905,6 +912,7 @@ export default function AdminSalonLpPage() {
         excerpt: blogForm.excerpt || null,
         body: blogForm.body || null,
         featured_image_url: blogForm.featured_image_url,
+        featured_image_aspect: blogForm.featured_image_aspect,
         is_published: blogForm.is_published,
         published_at: toIso(blogForm.published_at) ?? (blogForm.is_published ? new Date().toISOString() : null),
         sort_order: blogForm.sort_order,
@@ -983,6 +991,7 @@ export default function AdminSalonLpPage() {
       description: blogMediaMeta.description || null,
       alt: blogMediaMeta.alt || null,
       sort_order: blogMediaMeta.sort_order,
+      media_aspect: blogMediaMeta.media_aspect,
     }).eq('id', mediaId);
     if (error) { showMessage(`保存失敗: ${error.message}`); return; }
     showMessage('保存しました');
@@ -1813,6 +1822,7 @@ export default function AdminSalonLpPage() {
                             excerpt: blog.excerpt ?? '',
                             body: blog.body ?? '',
                             featured_image_url: blog.featured_image_url,
+                            featured_image_aspect: (blog as Blog).featured_image_aspect ?? '4:3',
                             is_published: blog.is_published,
                             published_at: blog.published_at ? blog.published_at.slice(0, 16) : '',
                             sort_order: blog.sort_order,
@@ -1896,6 +1906,16 @@ export default function AdminSalonLpPage() {
                       >
                         {uploadingBlogImage ? 'アップロード中...' : '画像を選択'}
                       </button>
+                      <div className="mt-2">
+                        <label className="block text-[10px] tracking-wider text-stone-500 mb-1">表示比率</label>
+                        <select
+                          value={blogForm.featured_image_aspect}
+                          onChange={e => setBlogForm(prev => prev ? { ...prev, featured_image_aspect: e.target.value } : prev)}
+                          className="text-xs border border-stone-200 px-2 py-1.5 focus:outline-none focus:border-stone-400"
+                        >
+                          {BLOG_ASPECT_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+                        </select>
+                      </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
@@ -1963,7 +1983,7 @@ export default function AdminSalonLpPage() {
                                     type="button"
                                     onClick={() => {
                                       setEditingBlogMediaId(editingBlogMediaId === m.id ? null : m.id);
-                                      if (editingBlogMediaId !== m.id) setBlogMediaMeta({ title: m.title ?? '', description: m.description ?? '', alt: m.alt ?? '', sort_order: m.sort_order });
+                                      if (editingBlogMediaId !== m.id) setBlogMediaMeta({ title: m.title ?? '', description: m.description ?? '', alt: m.alt ?? '', sort_order: m.sort_order, media_aspect: m.media_aspect ?? '4:3' });
                                     }}
                                     className="text-[10px] border border-stone-200 px-2 py-0.5 hover:border-stone-400 transition-colors"
                                   >編集</button>
@@ -1985,9 +2005,17 @@ export default function AdminSalonLpPage() {
                                     <label className="block text-[10px] text-stone-400 mb-0.5">説明</label>
                                     <input type="text" value={blogMediaMeta.description} onChange={e => setBlogMediaMeta(p => ({ ...p, description: e.target.value }))} className="w-full text-[10px] border border-stone-200 px-2 py-1 focus:outline-none" />
                                   </div>
-                                  <div>
-                                    <label className="block text-[10px] text-stone-400 mb-0.5">並び順</label>
-                                    <input type="number" value={blogMediaMeta.sort_order} onChange={e => setBlogMediaMeta(p => ({ ...p, sort_order: Number(e.target.value) }))} className="w-20 text-[10px] border border-stone-200 px-2 py-1 focus:outline-none" />
+                                  <div className="flex gap-4 items-end">
+                                    <div>
+                                      <label className="block text-[10px] text-stone-400 mb-0.5">並び順</label>
+                                      <input type="number" value={blogMediaMeta.sort_order} onChange={e => setBlogMediaMeta(p => ({ ...p, sort_order: Number(e.target.value) }))} className="w-20 text-[10px] border border-stone-200 px-2 py-1 focus:outline-none" />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[10px] text-stone-400 mb-0.5">表示比率</label>
+                                      <select value={blogMediaMeta.media_aspect} onChange={e => setBlogMediaMeta(p => ({ ...p, media_aspect: e.target.value }))} className="text-[10px] border border-stone-200 px-1 py-1 focus:outline-none">
+                                        {BLOG_ASPECT_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+                                      </select>
+                                    </div>
                                   </div>
                                   <button type="button" onClick={() => saveBlogMediaMeta(m.id)} className="text-[10px] border border-stone-700 text-stone-700 px-3 py-1 hover:bg-stone-700 hover:text-white transition-colors">保存</button>
                                 </div>
@@ -2081,6 +2109,16 @@ export default function AdminSalonLpPage() {
               >
                 {uploadingBlogImage ? 'アップロード中...' : '画像を選択'}
               </button>
+              <div className="mt-2">
+                <label className="block text-[10px] tracking-wider text-stone-500 mb-1">表示比率</label>
+                <select
+                  value={newBlogForm.featured_image_aspect}
+                  onChange={e => setNewBlogForm(prev => ({ ...prev, featured_image_aspect: e.target.value }))}
+                  className="text-xs border border-stone-200 px-2 py-1.5 focus:outline-none focus:border-stone-400"
+                >
+                  {BLOG_ASPECT_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>

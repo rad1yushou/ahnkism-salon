@@ -97,8 +97,20 @@ type RecentBlog = {
   author_name: string | null;
   excerpt: string | null;
   featured_image_url: string | null;
+  featured_image_aspect: string | null;
   published_at: string | null;
 };
+
+function blogAspectClass(aspect: string | null): string {
+  const map: Record<string, string> = {
+    '1:1':  'aspect-square',
+    '4:3':  'aspect-[4/3]',
+    '3:4':  'aspect-[3/4]',
+    '16:9': 'aspect-video',
+    '9:16': 'aspect-[9/16]',
+  };
+  return map[aspect ?? ''] ?? 'aspect-[4/3]';
+}
 
 // hero と intro 以外は複数メディアグリッド表示を行う（カスタムセクションも含む）
 function isMultiMediaSection(sectionType: string): boolean {
@@ -150,7 +162,7 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
         .order('sort_order', { ascending: true }),
       supabase
         .from('salon_blogs')
-        .select('id, title, category, author_name, excerpt, featured_image_url, published_at')
+        .select('id, title, category, author_name, excerpt, featured_image_url, featured_image_aspect, published_at')
         .eq('salon_slug', slug)
         .eq('is_published', true)
         .order('published_at', { ascending: false })
@@ -573,7 +585,7 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
               {recentBlogs.map(blog => (
                 <article key={blog.id} className="border border-stone-100">
                   {blog.featured_image_url && (
-                    <div className="aspect-[4/3] overflow-hidden">
+                    <div className={`${blogAspectClass(blog.featured_image_aspect)} overflow-hidden`}>
                       <Image
                         src={blog.featured_image_url}
                         alt={blog.title}
