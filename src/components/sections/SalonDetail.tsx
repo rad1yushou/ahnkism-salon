@@ -589,13 +589,13 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
                   <Link key={blog.id} href={`/salon/${slug}/blog/${blog.slug}`} className="block border border-stone-100 hover:border-stone-300 transition-colors">
                     <article>
                       {blog.featured_image_url && (
-                        <div className="h-16 overflow-hidden">
+                        <div className="h-16 overflow-hidden bg-stone-50 flex items-center justify-center">
                           <Image
                             src={blog.featured_image_url}
                             alt={blog.title}
                             width={300}
                             height={64}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-contain"
                           />
                         </div>
                       )}

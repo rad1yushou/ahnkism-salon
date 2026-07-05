@@ -93,13 +93,13 @@ export default async function BlogDetail({ salonSlug, blogSlug }: BlogDetailProp
 
         {/* アイキャッチ画像 */}
         {blog.featured_image_url && (
-          <div className={`${aspectClass(blog.featured_image_aspect)} overflow-hidden mb-8`}>
+          <div className={`${aspectClass(blog.featured_image_aspect)} overflow-hidden mb-8 bg-stone-50 flex items-center justify-center`}>
             <Image
               src={blog.featured_image_url}
               alt={blog.title}
               width={800}
               height={600}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain"
               priority
             />
           </div>
@@ -122,13 +122,13 @@ export default async function BlogDetail({ salonSlug, blogSlug }: BlogDetailProp
             <p className="text-[10px] tracking-[0.3em] text-stone-400 uppercase mb-4">Gallery</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {media.map(m => (
-                <div key={m.id} className={`${aspectClass(m.media_aspect)} overflow-hidden`}>
+                <div key={m.id} className={`${aspectClass(m.media_aspect)} overflow-hidden bg-stone-50 flex items-center justify-center`}>
                   <Image
                     src={m.media_url}
                     alt={m.alt ?? m.title ?? ''}
                     width={400}
                     height={300}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain"
                   />
                 </div>
               ))}
