@@ -414,6 +414,18 @@ export default function AdminStaffPage() {
     await loadData();
   };
 
+  const moveStaff = async (s: Staff, direction: 'up' | 'down') => {
+    if (!supabase) return;
+    const group = staff.filter(m => m.salon_slug === s.salon_slug);
+    const idx = group.findIndex(m => m.id === s.id);
+    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= group.length) return;
+    const newGroup = [...group];
+    [newGroup[idx], newGroup[targetIdx]] = [newGroup[targetIdx], newGroup[idx]];
+    await Promise.all(newGroup.map((m, i) => supabase!.from('staff').update({ sort_order: i }).eq('id', m.id)));
+    await loadData();
+  };
+
   const deleteStaff = async (s: Staff) => {
     if (!supabase) return;
     if (!window.confirm(`「${s.name}」を削除しますか？この操作は取り消せません。`)) return;
@@ -643,6 +655,18 @@ export default function AdminStaffPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  {(() => {
+                    const group = staff.filter(m => m.salon_slug === s.salon_slug);
+                    const idx = group.findIndex(m => m.id === s.id);
+                    return (
+                      <>
+                        <button onClick={() => moveStaff(s, 'up')} disabled={idx === 0}
+                          className="text-[10px] text-stone-400 border border-stone-200 px-1.5 py-1 hover:border-stone-400 transition-colors disabled:opacity-30">↑</button>
+                        <button onClick={() => moveStaff(s, 'down')} disabled={idx === group.length - 1}
+                          className="text-[10px] text-stone-400 border border-stone-200 px-1.5 py-1 hover:border-stone-400 transition-colors disabled:opacity-30">↓</button>
+                      </>
+                    );
+                  })()}
                   <button
                     onClick={() => toggleActive(s)}
                     disabled={!isConfigured}

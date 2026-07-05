@@ -167,6 +167,7 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
         .select('id, slug, title, category, author_name, excerpt, featured_image_url, featured_image_aspect, published_at')
         .eq('salon_slug', slug)
         .eq('is_published', true)
+        .order('sort_order', { ascending: true })
         .order('published_at', { ascending: false })
         .limit(6),
     ]);

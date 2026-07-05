@@ -205,6 +205,17 @@ export default function AdminBlogsPage() {
     if (editingBlogId === blog.id && blogForm) setBlogForm(p => p ? { ...p, is_published: next } : p);
   };
 
+  const moveBlog = async (blog: Blog, direction: 'up' | 'down') => {
+    if (!supabase) return;
+    const idx = blogs.findIndex(b => b.id === blog.id);
+    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= blogs.length) return;
+    const newBlogs = [...blogs];
+    [newBlogs[idx], newBlogs[targetIdx]] = [newBlogs[targetIdx], newBlogs[idx]];
+    await Promise.all(newBlogs.map((b, i) => supabase!.from('salon_blogs').update({ sort_order: i }).eq('id', b.id)));
+    await loadBlogs(selectedSlug);
+  };
+
   const uploadFeatured = async (file: File) => {
     if (!supabase) return;
     setUploadingFeatured(true);
@@ -303,6 +314,10 @@ export default function AdminBlogsPage() {
                   {blog.category && <span className="shrink-0 text-[10px] text-stone-400">[{blog.category}]</span>}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
+                  <button type="button" onClick={() => moveBlog(blog, 'up')} disabled={blogs.indexOf(blog) === 0}
+                    className="text-[10px] text-stone-400 border border-stone-200 px-1.5 py-1 hover:border-stone-400 transition-colors disabled:opacity-30">↑</button>
+                  <button type="button" onClick={() => moveBlog(blog, 'down')} disabled={blogs.indexOf(blog) === blogs.length - 1}
+                    className="text-[10px] text-stone-400 border border-stone-200 px-1.5 py-1 hover:border-stone-400 transition-colors disabled:opacity-30">↓</button>
                   <button type="button" onClick={() => togglePublished(blog)}
                     className="text-[10px] tracking-wider text-stone-500 border border-stone-300 px-2 py-1 hover:border-stone-500 transition-colors">
                     {blog.is_published ? '非公開に' : '公開に'}
