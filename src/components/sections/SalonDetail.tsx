@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { connection } from 'next/server';
 import Image from 'next/image';
+import Link from 'next/link';
 import { buildSalonSchema } from '@/lib/schema';
 import JsonLd from '@/components/seo/JsonLd';
 import Breadcrumb from '@/components/seo/Breadcrumb';
@@ -92,6 +93,7 @@ const SECTION_LABEL: Record<string, string> = {
 
 type RecentBlog = {
   id: string;
+  slug: string;
   title: string;
   category: string | null;
   author_name: string | null;
@@ -162,7 +164,7 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
         .order('sort_order', { ascending: true }),
       supabase
         .from('salon_blogs')
-        .select('id, title, category, author_name, excerpt, featured_image_url, featured_image_aspect, published_at')
+        .select('id, slug, title, category, author_name, excerpt, featured_image_url, featured_image_aspect, published_at')
         .eq('salon_slug', slug)
         .eq('is_published', true)
         .order('published_at', { ascending: false })
@@ -584,30 +586,32 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
             <div className="max-w-2xl mx-auto">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {recentBlogs.map(blog => (
-                  <article key={blog.id} className="border border-stone-100">
-                    {blog.featured_image_url && (
-                      <div className={`${blogAspectClass(blog.featured_image_aspect)} overflow-hidden`}>
-                        <Image
-                          src={blog.featured_image_url}
-                          alt={blog.title}
-                          width={300}
-                          height={225}
-                          className="w-full h-full object-cover"
-                        />
+                  <Link key={blog.id} href={`/salon/${slug}/blog/${blog.slug}`} className="block border border-stone-100 hover:border-stone-300 transition-colors">
+                    <article>
+                      {blog.featured_image_url && (
+                        <div className={`${blogAspectClass(blog.featured_image_aspect)} overflow-hidden`}>
+                          <Image
+                            src={blog.featured_image_url}
+                            alt={blog.title}
+                            width={300}
+                            height={225}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      )}
+                      <div className="p-1.5">
+                        {blog.category && (
+                          <p className="text-[8px] tracking-[0.15em] text-[#C9A96E] uppercase mb-0.5">{blog.category}</p>
+                        )}
+                        <h3 className="text-[10px] font-light text-stone-800 leading-snug line-clamp-2">{blog.title}</h3>
+                        {blog.published_at && (
+                          <time className="block text-[8px] text-stone-300 mt-1" dateTime={blog.published_at}>
+                            {new Date(blog.published_at).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' })}
+                          </time>
+                        )}
                       </div>
-                    )}
-                    <div className="p-1.5">
-                      {blog.category && (
-                        <p className="text-[8px] tracking-[0.15em] text-[#C9A96E] uppercase mb-0.5">{blog.category}</p>
-                      )}
-                      <h3 className="text-[10px] font-light text-stone-800 leading-snug line-clamp-2">{blog.title}</h3>
-                      {blog.published_at && (
-                        <time className="block text-[8px] text-stone-300 mt-1" dateTime={blog.published_at}>
-                          {new Date(blog.published_at).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' })}
-                        </time>
-                      )}
-                    </div>
-                  </article>
+                    </article>
+                  </Link>
                 ))}
               </div>
             </div>
