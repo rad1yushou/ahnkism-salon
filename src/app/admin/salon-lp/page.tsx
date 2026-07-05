@@ -68,6 +68,15 @@ type BlogForm = {
   sort_order: number;
 };
 
+type SalonStaff = {
+  id: string;
+  slug: string;
+  name: string;
+  role: string | null;
+  sort_order: number;
+  is_active: boolean;
+};
+
 const BLOG_ASPECT_OPTIONS = ['4:3', '3:4', '1:1', '16:9', '9:16'] as const;
 
 const EMPTY_BLOG_FORM: BlogForm = {
@@ -232,6 +241,9 @@ export default function AdminSalonLpPage() {
   const blogImageRef = useRef<HTMLInputElement>(null);
   const blogMediaFileRef = useRef<HTMLInputElement>(null);
 
+  const [salonStaff, setSalonStaff] = useState<SalonStaff[]>([]);
+  const [loadingStaff, setLoadingStaff] = useState(false);
+
   const showMessage = (msg: string) => {
     setMessage(msg);
     setTimeout(() => setMessage(''), 4000);
@@ -363,6 +375,29 @@ export default function AdminSalonLpPage() {
     setLoadingBlogMedia(false);
   }, [supabase]);
 
+  const loadStaff = useCallback(async (slug: string) => {
+    if (!supabase) return;
+    setLoadingStaff(true);
+    const { data } = await supabase
+      .from('staff')
+      .select('id, slug, name, role, sort_order, is_active')
+      .eq('salon_slug', slug)
+      .order('sort_order', { ascending: true });
+    setSalonStaff((data ?? []) as SalonStaff[]);
+    setLoadingStaff(false);
+  }, [supabase]);
+
+  const moveStaff = async (s: SalonStaff, direction: 'up' | 'down') => {
+    if (!supabase) return;
+    const idx = salonStaff.findIndex(m => m.id === s.id);
+    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= salonStaff.length) return;
+    const newList = [...salonStaff];
+    [newList[idx], newList[targetIdx]] = [newList[targetIdx], newList[idx]];
+    await Promise.all(newList.map((m, i) => supabase!.from('staff').update({ sort_order: i }).eq('id', m.id)));
+    await loadStaff(selectedSlug);
+  };
+
   useEffect(() => {
     setEditingId(null);
     setForm(null);
@@ -373,7 +408,8 @@ export default function AdminSalonLpPage() {
     loadSlides(selectedSlug);
     loadPickups(selectedSlug);
     loadBlogs(selectedSlug);
-  }, [loadSections, loadSlides, loadPickups, loadBlogs, selectedSlug]);
+    loadStaff(selectedSlug);
+  }, [loadSections, loadSlides, loadPickups, loadBlogs, loadStaff, selectedSlug]);
 
   useEffect(() => {
     if (editingId) {
@@ -2176,6 +2212,38 @@ export default function AdminSalonLpPage() {
           >
             + 新規ブログ記事を追加
           </button>
+        )}
+      </div>
+
+      {/* ── スタッフ表示順 ── */}
+      <div className="mt-10 pt-8 border-t border-stone-200">
+        <p className="text-[10px] tracking-[0.3em] text-[#C9A96E] uppercase mb-1.5">Staff Order</p>
+        <h2 className="text-sm font-light tracking-wider text-stone-800 mb-1">スタッフ表示順</h2>
+        <p className="text-xs text-stone-400 mb-4">↑↓ で表示順を変更できます。変更はすぐに保存されます。</p>
+        {loadingStaff ? (
+          <p className="text-xs text-stone-400">読み込み中...</p>
+        ) : salonStaff.length === 0 ? (
+          <p className="text-xs text-stone-400">スタッフデータがありません</p>
+        ) : (
+          <div className="space-y-1 max-w-lg">
+            {salonStaff.map(s => (
+              <div key={s.id} className="flex items-center justify-between gap-3 px-3 py-2 border border-stone-200 bg-white">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className={`shrink-0 text-[10px] px-1.5 py-0.5 border ${s.is_active ? 'border-emerald-400 text-emerald-600' : 'border-stone-300 text-stone-400'}`}>
+                    {s.is_active ? '表示' : '非表示'}
+                  </span>
+                  <span className="text-xs text-stone-700 truncate">{s.name}</span>
+                  {s.role && <span className="shrink-0 text-[10px] text-stone-400">{s.role}</span>}
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button type="button" onClick={() => moveStaff(s, 'up')} disabled={salonStaff.indexOf(s) === 0}
+                    className="text-[10px] text-stone-400 border border-stone-200 px-1.5 py-1 hover:border-stone-400 transition-colors disabled:opacity-30">↑</button>
+                  <button type="button" onClick={() => moveStaff(s, 'down')} disabled={salonStaff.indexOf(s) === salonStaff.length - 1}
+                    className="text-[10px] text-stone-400 border border-stone-200 px-1.5 py-1 hover:border-stone-400 transition-colors disabled:opacity-30">↓</button>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </div>
