@@ -589,23 +589,26 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
                   <Link key={blog.id} href={`/salon/${slug}/blog/${blog.slug}`} className="block border border-stone-100 hover:border-stone-300 transition-colors">
                     <article>
                       {blog.featured_image_url && (
-                        <div className={`${blogAspectClass(blog.featured_image_aspect)} overflow-hidden`}>
+                        <div className="h-16 overflow-hidden">
                           <Image
                             src={blog.featured_image_url}
                             alt={blog.title}
                             width={300}
-                            height={225}
+                            height={64}
                             className="w-full h-full object-cover"
                           />
                         </div>
                       )}
-                      <div className="p-1.5">
+                      <div className="p-2">
                         {blog.category && (
-                          <p className="text-[8px] tracking-[0.15em] text-[#C9A96E] uppercase mb-0.5">{blog.category}</p>
+                          <p className="text-[9px] tracking-[0.15em] text-[#C9A96E] uppercase mb-0.5">{blog.category}</p>
                         )}
-                        <h3 className="text-[10px] font-light text-stone-800 leading-snug line-clamp-2">{blog.title}</h3>
+                        <h3 className="text-xs font-light text-stone-800 leading-snug line-clamp-2 mb-1">{blog.title}</h3>
+                        {blog.excerpt && (
+                          <p className="text-[10px] text-stone-400 leading-relaxed line-clamp-2 mb-1">{blog.excerpt}</p>
+                        )}
                         {blog.published_at && (
-                          <time className="block text-[8px] text-stone-300 mt-1" dateTime={blog.published_at}>
+                          <time className="block text-[9px] text-stone-300" dateTime={blog.published_at}>
                             {new Date(blog.published_at).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' })}
                           </time>
                         )}
