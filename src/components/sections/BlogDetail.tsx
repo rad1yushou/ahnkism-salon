@@ -13,6 +13,7 @@ type BlogDetailProps = {
 type BlogMedia = {
   id: string;
   media_url: string;
+  media_type: string;
   title: string | null;
   alt: string | null;
   sort_order: number;
@@ -38,7 +39,7 @@ export default async function BlogDetail({ salonSlug, blogSlug }: BlogDetailProp
 
   const { data: blog, error } = await supabase
     .from('salon_blogs')
-    .select('id, title, category, author_name, excerpt, body, featured_image_url, featured_image_aspect, published_at')
+    .select('id, title, category, author_name, excerpt, body, featured_image_url, featured_image_aspect, display_order, published_at')
     .eq('salon_slug', salonSlug)
     .eq('slug', blogSlug)
     .eq('is_published', true)
@@ -48,7 +49,7 @@ export default async function BlogDetail({ salonSlug, blogSlug }: BlogDetailProp
 
   const { data: mediaData } = await supabase
     .from('salon_blog_media')
-    .select('id, media_url, title, alt, sort_order, media_aspect')
+    .select('id, media_url, media_type, title, alt, sort_order, media_aspect')
     .eq('blog_id', blog.id)
     .eq('is_active', true)
     .order('sort_order', { ascending: true });
@@ -105,36 +106,53 @@ export default async function BlogDetail({ salonSlug, blogSlug }: BlogDetailProp
           </div>
         )}
 
-        {/* 本文 */}
-        {blog.body && (
-          <div className="prose prose-stone prose-sm max-w-none mb-10">
-            {blog.body.split('\n').map((line: string, i: number) => (
-              line.trim() === ''
-                ? <br key={i} />
-                : <p key={i} className="text-sm text-stone-700 leading-relaxed mb-3">{line}</p>
-            ))}
-          </div>
-        )}
+        {/* 本文とギャラリーを display_order に応じて切り替え */}
+        {(() => {
+          const displayOrder = (blog as { display_order?: string | null }).display_order ?? 'body_first';
 
-        {/* 追加メディア */}
-        {media.length > 0 && (
-          <div className="mt-10 pt-8 border-t border-stone-100">
-            <p className="text-[10px] tracking-[0.3em] text-stone-400 uppercase mb-4">Gallery</p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {media.map(m => (
-                <div key={m.id} className={`${aspectClass(m.media_aspect)} overflow-hidden bg-stone-50 flex items-center justify-center`}>
-                  <Image
-                    src={m.media_url}
-                    alt={m.alt ?? m.title ?? ''}
-                    width={400}
-                    height={300}
-                    className="w-full h-full object-contain"
-                  />
-                </div>
+          const bodySection = blog.body ? (
+            <div key="body" className="prose prose-stone prose-sm max-w-none mb-10">
+              {blog.body.split('\n').map((line: string, i: number) => (
+                line.trim() === ''
+                  ? <br key={i} />
+                  : <p key={i} className="text-sm text-stone-700 leading-relaxed mb-3">{line}</p>
               ))}
             </div>
-          </div>
-        )}
+          ) : null;
+
+          const gallerySection = media.length > 0 ? (
+            <div key="gallery" className="mt-10 pt-8 border-t border-stone-100">
+              <p className="text-[10px] tracking-[0.3em] text-stone-400 uppercase mb-4">Gallery</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {media.map(m => (
+                  <div key={m.id} className={`${aspectClass(m.media_aspect)} overflow-hidden bg-stone-50 flex items-center justify-center`}>
+                    {m.media_type === 'video' ? (
+                      <video
+                        src={m.media_url}
+                        controls
+                        muted
+                        playsInline
+                        className="w-full h-full object-contain"
+                      />
+                    ) : (
+                      <Image
+                        src={m.media_url}
+                        alt={m.alt ?? m.title ?? ''}
+                        width={400}
+                        height={300}
+                        className="w-full h-full object-contain"
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null;
+
+          return displayOrder === 'media_first'
+            ? <>{gallerySection}{bodySection}</>
+            : <>{bodySection}{gallerySection}</>;
+        })()}
 
         {/* 戻るリンク */}
         <div className="mt-12 pt-8 border-t border-stone-100">

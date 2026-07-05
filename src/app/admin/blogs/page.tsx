@@ -23,6 +23,7 @@ type Blog = {
   is_published: boolean;
   published_at: string | null;
   sort_order: number;
+  display_order: string;
   created_at: string;
 };
 
@@ -30,6 +31,7 @@ type BlogMedia = {
   id: string;
   blog_id: string;
   media_url: string;
+  media_type: string;
   title: string | null;
   description: string | null;
   alt: string | null;
@@ -49,12 +51,13 @@ type BlogForm = {
   is_published: boolean;
   published_at: string;
   sort_order: number;
+  display_order: string;
 };
 
 const EMPTY_BLOG_FORM: BlogForm = {
   title: '', category: '', author_name: '', excerpt: '', body: '',
   featured_image_url: null, featured_image_aspect: '4:3',
-  is_published: false, published_at: '', sort_order: 0,
+  is_published: false, published_at: '', sort_order: 0, display_order: 'body_first',
 };
 
 const toIso = (v: string): string | null => {
@@ -94,7 +97,7 @@ export default function AdminBlogsPage() {
     setLoadingBlogs(true);
     const { data, error } = await supabase
       .from('salon_blogs')
-      .select('id, salon_slug, title, category, author_name, excerpt, body, featured_image_url, featured_image_aspect, is_published, published_at, sort_order, created_at')
+      .select('id, salon_slug, title, category, author_name, excerpt, body, featured_image_url, featured_image_aspect, is_published, published_at, sort_order, display_order, created_at')
       .eq('salon_slug', slug)
       .order('sort_order', { ascending: true })
       .order('created_at', { ascending: false });
@@ -108,7 +111,7 @@ export default function AdminBlogsPage() {
     setLoadingMedia(true);
     const { data } = await supabase
       .from('salon_blog_media')
-      .select('id, blog_id, media_url, title, description, alt, sort_order, is_active, media_aspect')
+      .select('id, blog_id, media_url, media_type, title, description, alt, sort_order, is_active, media_aspect')
       .eq('blog_id', blogId)
       .order('sort_order', { ascending: true });
     setBlogMedia((data ?? []) as BlogMedia[]);
@@ -147,6 +150,7 @@ export default function AdminBlogsPage() {
         is_published: newBlogForm.is_published,
         published_at: toIso(newBlogForm.published_at) ?? (newBlogForm.is_published ? new Date().toISOString() : null),
         sort_order: newBlogForm.sort_order,
+        display_order: newBlogForm.display_order,
       }).select('id').single();
       if (error) { showMsg(`作成失敗: ${error.message}`); return; }
       showMsg('ブログを作成しました');
@@ -157,7 +161,7 @@ export default function AdminBlogsPage() {
         const { data: b } = await supabase.from('salon_blogs').select('*').eq('id', data.id).single();
         if (b) {
           setEditingBlogId(b.id);
-          setBlogForm({ title: b.title, category: b.category ?? '', author_name: b.author_name ?? '', excerpt: b.excerpt ?? '', body: b.body ?? '', featured_image_url: b.featured_image_url, featured_image_aspect: b.featured_image_aspect ?? '4:3', is_published: b.is_published, published_at: b.published_at ? b.published_at.slice(0, 16) : '', sort_order: b.sort_order });
+          setBlogForm({ title: b.title, category: b.category ?? '', author_name: b.author_name ?? '', excerpt: b.excerpt ?? '', body: b.body ?? '', featured_image_url: b.featured_image_url, featured_image_aspect: b.featured_image_aspect ?? '4:3', is_published: b.is_published, published_at: b.published_at ? b.published_at.slice(0, 16) : '', sort_order: b.sort_order, display_order: b.display_order ?? 'body_first' });
         }
       }
     } finally { setSavingBlog(false); }
@@ -178,6 +182,7 @@ export default function AdminBlogsPage() {
         is_published: blogForm.is_published,
         published_at: toIso(blogForm.published_at) ?? (blogForm.is_published ? new Date().toISOString() : null),
         sort_order: blogForm.sort_order,
+        display_order: blogForm.display_order,
         updated_at: new Date().toISOString(),
       }).eq('id', editingBlogId);
       if (error) { showMsg(`保存失敗: ${error.message}`); return; }
@@ -218,14 +223,15 @@ export default function AdminBlogsPage() {
     if (!supabase || !editingBlogId) return;
     setUploadingMedia(true);
     try {
+      const mediaType = file.type.startsWith('video/') ? 'video' : 'image';
       const ext = file.name.split('.').pop() ?? 'jpg';
       const path = `salons/${selectedSlug}/blog/${editingBlogId}/${Date.now()}.${ext}`;
       const { error } = await supabase.storage.from(BUCKET).upload(path, file, { upsert: false });
       if (error) { showMsg(`アップロード失敗: ${error.message}`); return; }
       const { data: u } = supabase.storage.from(BUCKET).getPublicUrl(path);
-      const { error: dbErr } = await supabase.from('salon_blog_media').insert({ blog_id: editingBlogId, media_url: u.publicUrl, sort_order: blogMedia.length });
+      const { error: dbErr } = await supabase.from('salon_blog_media').insert({ blog_id: editingBlogId, media_url: u.publicUrl, media_type: mediaType, sort_order: blogMedia.length });
       if (dbErr) { showMsg(`DB保存失敗: ${dbErr.message}`); return; }
-      showMsg('画像を追加しました');
+      showMsg(`${mediaType === 'video' ? '動画' : '画像'}を追加しました`);
       await loadMedia(editingBlogId);
     } finally { setUploadingMedia(false); if (mediaRef.current) mediaRef.current.value = ''; }
   };
@@ -267,7 +273,7 @@ export default function AdminBlogsPage() {
 
       <input ref={featuredRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden"
         onChange={e => { const f = e.target.files?.[0]; if (f) uploadFeatured(f); }} />
-      <input ref={mediaRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden"
+      <input ref={mediaRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime" className="hidden"
         onChange={e => { const f = e.target.files?.[0]; if (f) uploadMedia(f); }} />
 
       {/* 店舗セレクタ */}
@@ -305,7 +311,7 @@ export default function AdminBlogsPage() {
                     if (editingBlogId === blog.id) { setEditingBlogId(null); setBlogForm(null); }
                     else {
                       setEditingBlogId(blog.id);
-                      setBlogForm({ title: blog.title, category: blog.category ?? '', author_name: blog.author_name ?? '', excerpt: blog.excerpt ?? '', body: blog.body ?? '', featured_image_url: blog.featured_image_url, featured_image_aspect: blog.featured_image_aspect ?? '4:3', is_published: blog.is_published, published_at: blog.published_at ? blog.published_at.slice(0, 16) : '', sort_order: blog.sort_order });
+                      setBlogForm({ title: blog.title, category: blog.category ?? '', author_name: blog.author_name ?? '', excerpt: blog.excerpt ?? '', body: blog.body ?? '', featured_image_url: blog.featured_image_url, featured_image_aspect: blog.featured_image_aspect ?? '4:3', is_published: blog.is_published, published_at: blog.published_at ? blog.published_at.slice(0, 16) : '', sort_order: blog.sort_order, display_order: blog.display_order ?? 'body_first' });
                     }
                   }} className="text-[10px] tracking-wider text-stone-500 border border-stone-300 px-2 py-1 hover:border-stone-500 transition-colors">
                     {editingBlogId === blog.id ? '閉じる' : '編集'}
@@ -377,6 +383,14 @@ export default function AdminBlogsPage() {
                     </div>
                   </div>
                   <div>
+                    <label className="block text-[10px] tracking-wider text-stone-500 mb-1">詳細ページの表示順</label>
+                    <select value={blogForm.display_order} onChange={e => setBlogForm(p => p ? { ...p, display_order: e.target.value } : p)}
+                      className="text-xs border border-stone-200 px-2 py-1.5 focus:outline-none">
+                      <option value="body_first">本文 → 画像・動画</option>
+                      <option value="media_first">画像・動画 → 本文</option>
+                    </select>
+                  </div>
+                  <div>
                     <label className="block text-[10px] tracking-wider text-stone-500 mb-1">投稿日時（空欄の場合、公開時に自動セット）</label>
                     <input type="datetime-local" value={blogForm.published_at} onChange={e => setBlogForm(p => p ? { ...p, published_at: e.target.value } : p)}
                       className="text-xs border border-stone-200 px-3 py-2 focus:outline-none focus:border-stone-400" />
@@ -394,11 +408,17 @@ export default function AdminBlogsPage() {
                         {blogMedia.map(m => (
                           <div key={m.id} className="border border-stone-100 p-2">
                             <div className="flex items-center gap-2">
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src={m.media_url} alt={m.alt ?? ''} className="h-12 w-auto object-cover border border-stone-200 shrink-0" />
+                              {m.media_type === 'video' ? (
+                                <div className="h-12 w-16 bg-stone-100 border border-stone-200 shrink-0 flex items-center justify-center">
+                                  <span className="text-[9px] text-stone-400 tracking-wider">VIDEO</span>
+                                </div>
+                              ) : (
+                                /* eslint-disable-next-line @next/next/no-img-element */
+                                <img src={m.media_url} alt={m.alt ?? ''} className="h-12 w-auto object-cover border border-stone-200 shrink-0" />
+                              )}
                               <div className="flex-1 min-w-0">
                                 <p className="text-[10px] text-stone-500 truncate">{m.title || '(タイトルなし)'}</p>
-                                <p className="text-[10px] text-stone-400">比率: {m.media_aspect} / {m.is_active ? '表示' : '非表示'}</p>
+                                <p className="text-[10px] text-stone-400">{m.media_type === 'video' ? '動画' : '画像'} / 比率: {m.media_aspect} / {m.is_active ? '表示' : '非表示'}</p>
                               </div>
                               <div className="flex gap-1 shrink-0">
                                 <button type="button" onClick={() => toggleMediaActive(m.id, m.is_active)}
@@ -521,6 +541,14 @@ export default function AdminBlogsPage() {
               <input type="number" value={newBlogForm.sort_order} onChange={e => setNewBlogForm(p => ({ ...p, sort_order: Number(e.target.value) }))}
                 className="w-full text-xs border border-stone-200 px-3 py-2 focus:outline-none focus:border-stone-400" />
             </div>
+          </div>
+          <div>
+            <label className="block text-[10px] tracking-wider text-stone-500 mb-1">詳細ページの表示順</label>
+            <select value={newBlogForm.display_order} onChange={e => setNewBlogForm(p => ({ ...p, display_order: e.target.value }))}
+              className="text-xs border border-stone-200 px-2 py-1.5 focus:outline-none">
+              <option value="body_first">本文 → 画像・動画</option>
+              <option value="media_first">画像・動画 → 本文</option>
+            </select>
           </div>
           <div>
             <label className="block text-[10px] tracking-wider text-stone-500 mb-1">投稿日時（空欄の場合、公開時に自動セット）</label>
