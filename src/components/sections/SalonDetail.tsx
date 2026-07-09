@@ -89,6 +89,8 @@ const SECTION_LABEL: Record<string, string> = {
   technique: 'Technique',
   staff_vibe: 'Staff',
   before_after: 'Before / After',
+  staff: 'Staff',
+  blog: 'Blog',
 };
 
 type RecentBlog = {
@@ -114,9 +116,9 @@ function blogAspectClass(aspect: string | null): string {
   return map[aspect ?? ''] ?? 'aspect-[4/3]';
 }
 
-// hero と intro 以外は複数メディアグリッド表示を行う（カスタムセクションも含む）
+// hero / intro / staff / blog 以外は複数メディアグリッド表示を行う（カスタムセクションも含む）
 function isMultiMediaSection(sectionType: string): boolean {
-  return sectionType !== 'hero' && sectionType !== 'intro';
+  return sectionType !== 'hero' && sectionType !== 'intro' && sectionType !== 'staff' && sectionType !== 'blog';
 }
 
 export default async function SalonDetail({ slug }: SalonDetailProps) {
@@ -385,9 +387,78 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
       {/* ── Pick Up ── */}
       <PickupSection salonSlug={slug} />
 
-      {/* ── LP セクション ── */}
+      {/* ── LP セクション（staff / blog を含む sort_order 順） ── */}
       {nonHeroSections.map((sec, i) => {
         const label = SECTION_LABEL[sec.section_type] ?? sec.title;
+
+        // スタッフセクション
+        if (sec.section_type === 'staff') {
+          if (staff.length === 0) return null;
+          return (
+            <section key={sec.id} className="py-16 sm:py-20 border-t border-stone-100">
+              <Container>
+                <p className="text-[10px] tracking-[0.3em] text-[#C9A96E] uppercase mb-3 text-center">Staff</p>
+                <h2 className="text-xl font-light tracking-wider text-stone-800 mb-10 text-center">
+                  在籍スタッフ
+                </h2>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
+                  {staff.map((m) => (
+                    <StaffCard key={m.slug} member={m} />
+                  ))}
+                </div>
+              </Container>
+            </section>
+          );
+        }
+
+        // ブログセクション
+        if (sec.section_type === 'blog') {
+          if (recentBlogs.length === 0) return null;
+          return (
+            <section key={sec.id} className="py-8 sm:py-10 border-t border-stone-100">
+              <Container>
+                <p className="text-[9px] tracking-[0.3em] text-[#C9A96E] uppercase mb-1.5 text-center">Blog</p>
+                <h2 className="text-sm font-light tracking-wider text-stone-800 mb-4 text-center">ブログ</h2>
+                <div className="max-w-2xl mx-auto">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {recentBlogs.map(blog => (
+                      <Link key={blog.id} href={`/salon/${slug}/blog/${blog.slug}`} className="block border border-stone-100 hover:border-stone-300 transition-colors">
+                        <article>
+                          {blog.featured_image_url && (
+                            <div className="h-16 overflow-hidden bg-stone-50 flex items-center justify-center">
+                              <Image
+                                src={blog.featured_image_url}
+                                alt={blog.title}
+                                width={300}
+                                height={64}
+                                className="w-full h-full object-contain"
+                                unoptimized
+                              />
+                            </div>
+                          )}
+                          <div className="p-2">
+                            {blog.category && (
+                              <p className="text-[9px] tracking-[0.15em] text-[#C9A96E] uppercase mb-0.5">{blog.category}</p>
+                            )}
+                            <h3 className="text-xs font-light text-stone-800 leading-snug line-clamp-2 mb-1">{blog.title}</h3>
+                            {blog.excerpt && (
+                              <p className="text-[10px] text-stone-400 leading-relaxed line-clamp-2 mb-1">{blog.excerpt}</p>
+                            )}
+                            {blog.published_at && (
+                              <time className="block text-[9px] text-stone-300" dateTime={blog.published_at}>
+                                {new Date(blog.published_at).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' })}
+                              </time>
+                            )}
+                          </div>
+                        </article>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              </Container>
+            </section>
+          );
+        }
 
         // 複数メディアが登録されている場合はグリッド表示
         if (sec.sectionMedia.length > 0 && isMultiMediaSection(sec.section_type)) {
@@ -561,67 +632,7 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
         </section>
       )}
 
-      {/* ── スタッフ ── */}
-      {staff.length > 0 && (
-        <section className="py-16 sm:py-20 border-t border-stone-100">
-          <Container>
-            <p className="text-[10px] tracking-[0.3em] text-[#C9A96E] uppercase mb-3 text-center">Staff</p>
-            <h2 className="text-xl font-light tracking-wider text-stone-800 mb-10 text-center">
-              在籍スタッフ
-            </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
-              {staff.map((m) => (
-                <StaffCard key={m.slug} member={m} />
-              ))}
-            </div>
-          </Container>
-        </section>
-      )}
-
-      {/* ── ブログ ── */}
-      {recentBlogs.length > 0 && (
-        <section className="py-8 sm:py-10 border-t border-stone-100">
-          <Container>
-            <p className="text-[9px] tracking-[0.3em] text-[#C9A96E] uppercase mb-1.5 text-center">Blog</p>
-            <h2 className="text-sm font-light tracking-wider text-stone-800 mb-4 text-center">ブログ</h2>
-            <div className="max-w-2xl mx-auto">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {recentBlogs.map(blog => (
-                  <Link key={blog.id} href={`/salon/${slug}/blog/${blog.slug}`} className="block border border-stone-100 hover:border-stone-300 transition-colors">
-                    <article>
-                      {blog.featured_image_url && (
-                        <div className="h-16 overflow-hidden bg-stone-50 flex items-center justify-center">
-                          <Image
-                            src={blog.featured_image_url}
-                            alt={blog.title}
-                            width={300}
-                            height={64}
-                            className="w-full h-full object-contain"
-                          />
-                        </div>
-                      )}
-                      <div className="p-2">
-                        {blog.category && (
-                          <p className="text-[9px] tracking-[0.15em] text-[#C9A96E] uppercase mb-0.5">{blog.category}</p>
-                        )}
-                        <h3 className="text-xs font-light text-stone-800 leading-snug line-clamp-2 mb-1">{blog.title}</h3>
-                        {blog.excerpt && (
-                          <p className="text-[10px] text-stone-400 leading-relaxed line-clamp-2 mb-1">{blog.excerpt}</p>
-                        )}
-                        {blog.published_at && (
-                          <time className="block text-[9px] text-stone-300" dateTime={blog.published_at}>
-                            {new Date(blog.published_at).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' })}
-                          </time>
-                        )}
-                      </div>
-                    </article>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          </Container>
-        </section>
-      )}
+      {/* スタッフ・ブログは salon_lp_sections の sort_order に従い nonHeroSections.map() 内で描画 */}
 
       {/* ── アクセス ── */}
       <section className="py-16 sm:py-20 border-t border-stone-100 bg-stone-50">

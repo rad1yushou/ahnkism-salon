@@ -23,6 +23,8 @@ const SECTION_LABELS: Record<string, string> = {
   technique:    'おすすめ技術',
   staff_vibe:   'スタッフの雰囲気',
   before_after: 'Before / After',
+  staff:        'スタッフ紹介',
+  blog:         'ブログ',
 };
 
 // ── ブログ ──────────────────────────────────────────────────
@@ -92,9 +94,9 @@ const EMPTY_BLOG_FORM: BlogForm = {
   sort_order: 0,
 };
 
-// hero と intro 以外は複数メディア管理を表示（カスタムセクションも含む）
+// hero / intro / staff / blog 以外は複数メディア管理を表示（カスタムセクションも含む）
 function isMultiMediaSection(sectionType: string): boolean {
-  return sectionType !== 'hero' && sectionType !== 'intro';
+  return sectionType !== 'hero' && sectionType !== 'intro' && sectionType !== 'staff' && sectionType !== 'blog';
 }
 
 function extractStoragePath(url: string): string | null {
@@ -396,6 +398,17 @@ export default function AdminSalonLpPage() {
     [newList[idx], newList[targetIdx]] = [newList[targetIdx], newList[idx]];
     await Promise.all(newList.map((m, i) => supabase!.from('staff').update({ sort_order: i }).eq('id', m.id)));
     await loadStaff(selectedSlug);
+  };
+
+  const moveBlog = async (blog: Blog, direction: 'up' | 'down') => {
+    if (!supabase) return;
+    const idx = salonBlogs.findIndex(b => b.id === blog.id);
+    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= salonBlogs.length) return;
+    const newList = [...salonBlogs];
+    [newList[idx], newList[targetIdx]] = [newList[targetIdx], newList[idx]];
+    await Promise.all(newList.map((b, i) => supabase!.from('salon_blogs').update({ sort_order: i }).eq('id', b.id)));
+    await loadBlogs(selectedSlug);
   };
 
   useEffect(() => {
@@ -1182,8 +1195,442 @@ export default function AdminSalonLpPage() {
                   </div>
                 </div>
 
-                {/* 編集フォーム */}
-                {isEditing && form && (
+                {/* スタッフ表示順（staff セクション展開） */}
+                {isEditing && sec.section_type === 'staff' && (
+                  <div className="border-t border-stone-200 p-4 bg-stone-50">
+                    <p className="text-xs text-stone-500 mb-3">↑↓ で表示順を変更できます。変更はすぐに保存されます。</p>
+                    {loadingStaff ? (
+                      <p className="text-xs text-stone-400">読み込み中...</p>
+                    ) : salonStaff.length === 0 ? (
+                      <p className="text-xs text-stone-400">スタッフデータがありません</p>
+                    ) : (
+                      <div className="space-y-1 max-w-lg">
+                        {salonStaff.map(s => (
+                          <div key={s.id} className="flex items-center justify-between gap-3 px-3 py-2 border border-stone-200 bg-white">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className={`shrink-0 text-[10px] px-1.5 py-0.5 border ${s.is_active ? 'border-emerald-400 text-emerald-600' : 'border-stone-300 text-stone-400'}`}>
+                                {s.is_active ? '表示' : '非表示'}
+                              </span>
+                              <span className="text-xs text-stone-700 truncate">{s.name}</span>
+                              {s.role && <span className="shrink-0 text-[10px] text-stone-400">{s.role}</span>}
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button type="button" onClick={() => moveStaff(s, 'up')} disabled={salonStaff.indexOf(s) === 0}
+                                className="text-[10px] text-stone-400 border border-stone-200 px-1.5 py-1 hover:border-stone-400 transition-colors disabled:opacity-30">↑</button>
+                              <button type="button" onClick={() => moveStaff(s, 'down')} disabled={salonStaff.indexOf(s) === salonStaff.length - 1}
+                                className="text-[10px] text-stone-400 border border-stone-200 px-1.5 py-1 hover:border-stone-400 transition-colors disabled:opacity-30">↓</button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ブログ管理（blog セクション展開） */}
+                {isEditing && sec.section_type === 'blog' && (
+                  <div className="border-t border-stone-200 p-4 bg-stone-50 space-y-4">
+                    {loadingBlogs ? (
+                      <p className="text-xs text-stone-400 tracking-wider">読み込み中...</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {salonBlogs.map((blog, blogIdx) => (
+                          <div key={blog.id} className="border border-stone-200 p-3 bg-white">
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className={`shrink-0 text-[10px] px-1.5 py-0.5 border ${blog.is_published ? 'border-emerald-400 text-emerald-600' : 'border-stone-300 text-stone-400'}`}>
+                                  {blog.is_published ? '公開' : '非公開'}
+                                </span>
+                                <span className="text-xs text-stone-700 truncate">{blog.title}</span>
+                                {blog.category && <span className="shrink-0 text-[10px] text-stone-400">[{blog.category}]</span>}
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <button type="button" onClick={() => moveBlog(blog, 'up')} disabled={blogIdx === 0}
+                                  className="text-[10px] text-stone-400 border border-stone-200 px-1.5 py-1 hover:border-stone-400 transition-colors disabled:opacity-30">↑</button>
+                                <button type="button" onClick={() => moveBlog(blog, 'down')} disabled={blogIdx === salonBlogs.length - 1}
+                                  className="text-[10px] text-stone-400 border border-stone-200 px-1.5 py-1 hover:border-stone-400 transition-colors disabled:opacity-30">↓</button>
+                                <button
+                                  type="button"
+                                  onClick={() => toggleBlogPublished(blog)}
+                                  className="text-[10px] tracking-wider text-stone-500 border border-stone-300 px-2 py-1 hover:border-stone-500 transition-colors"
+                                >
+                                  {blog.is_published ? '非公開に' : '公開に'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (editingBlogId === blog.id) {
+                                      setEditingBlogId(null);
+                                      setBlogForm(null);
+                                    } else {
+                                      setEditingBlogId(blog.id);
+                                      setBlogForm({
+                                        title: blog.title,
+                                        category: blog.category ?? '',
+                                        author_name: blog.author_name ?? '',
+                                        excerpt: blog.excerpt ?? '',
+                                        body: blog.body ?? '',
+                                        featured_image_url: blog.featured_image_url,
+                                        featured_image_aspect: (blog as Blog).featured_image_aspect ?? '4:3',
+                                        is_published: blog.is_published,
+                                        published_at: blog.published_at ? blog.published_at.slice(0, 16) : '',
+                                        sort_order: blog.sort_order,
+                                      });
+                                    }
+                                  }}
+                                  className="text-[10px] tracking-wider text-stone-500 border border-stone-300 px-2 py-1 hover:border-stone-500 transition-colors"
+                                >
+                                  {editingBlogId === blog.id ? '閉じる' : '編集'}
+                                </button>
+                              </div>
+                            </div>
+
+                            {editingBlogId === blog.id && blogForm && (
+                              <div className="mt-4 space-y-3 border-t border-stone-100 pt-4">
+                                <div>
+                                  <label className="block text-[10px] tracking-wider text-stone-500 mb-1">タイトル *</label>
+                                  <input
+                                    type="text"
+                                    value={blogForm.title}
+                                    onChange={e => setBlogForm(prev => prev ? { ...prev, title: e.target.value } : prev)}
+                                    className="w-full text-xs border border-stone-200 px-3 py-2 focus:outline-none focus:border-stone-400"
+                                  />
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div>
+                                    <label className="block text-[10px] tracking-wider text-stone-500 mb-1">カテゴリ</label>
+                                    <input
+                                      type="text"
+                                      value={blogForm.category}
+                                      onChange={e => setBlogForm(prev => prev ? { ...prev, category: e.target.value } : prev)}
+                                      className="w-full text-xs border border-stone-200 px-3 py-2 focus:outline-none focus:border-stone-400"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-[10px] tracking-wider text-stone-500 mb-1">著者名</label>
+                                    <input
+                                      type="text"
+                                      value={blogForm.author_name}
+                                      onChange={e => setBlogForm(prev => prev ? { ...prev, author_name: e.target.value } : prev)}
+                                      className="w-full text-xs border border-stone-200 px-3 py-2 focus:outline-none focus:border-stone-400"
+                                    />
+                                  </div>
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] tracking-wider text-stone-500 mb-1">概要（excerpt）</label>
+                                  <textarea
+                                    rows={2}
+                                    value={blogForm.excerpt}
+                                    onChange={e => setBlogForm(prev => prev ? { ...prev, excerpt: e.target.value } : prev)}
+                                    className="w-full text-xs border border-stone-200 px-3 py-2 focus:outline-none focus:border-stone-400 resize-none"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] tracking-wider text-stone-500 mb-1">本文</label>
+                                  <textarea
+                                    rows={8}
+                                    value={blogForm.body}
+                                    onChange={e => setBlogForm(prev => prev ? { ...prev, body: e.target.value } : prev)}
+                                    className="w-full text-xs border border-stone-200 px-3 py-2 focus:outline-none focus:border-stone-400 resize-y"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] tracking-wider text-stone-500 mb-1">アイキャッチ画像</label>
+                                  {blogForm.featured_image_url && (
+                                    <div className="mb-2 flex items-start gap-2">
+                                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                                      <img src={blogForm.featured_image_url} alt="アイキャッチ" className="h-20 w-auto object-cover border border-stone-200" />
+                                      <button
+                                        type="button"
+                                        onClick={() => setBlogForm(prev => prev ? { ...prev, featured_image_url: null } : prev)}
+                                        className="text-[10px] text-stone-400 hover:text-stone-600"
+                                      >アイキャッチを外す</button>
+                                    </div>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => blogImageRef.current?.click()}
+                                    disabled={uploadingBlogImage}
+                                    className="text-[10px] tracking-wider text-stone-500 border border-stone-300 px-3 py-1 hover:border-stone-500 transition-colors disabled:opacity-40"
+                                  >
+                                    {uploadingBlogImage ? 'アップロード中...' : '画像を選択'}
+                                  </button>
+                                  <div className="mt-2">
+                                    <label className="block text-[10px] tracking-wider text-stone-500 mb-1">表示比率</label>
+                                    <select
+                                      value={blogForm.featured_image_aspect}
+                                      onChange={e => setBlogForm(prev => prev ? { ...prev, featured_image_aspect: e.target.value } : prev)}
+                                      className="text-xs border border-stone-200 px-2 py-1.5 focus:outline-none focus:border-stone-400"
+                                    >
+                                      {BLOG_ASPECT_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+                                    </select>
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div>
+                                    <label className="block text-[10px] tracking-wider text-stone-500 mb-1">公開状態</label>
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                      <input
+                                        type="checkbox"
+                                        checked={blogForm.is_published}
+                                        onChange={e => setBlogForm(prev => prev ? { ...prev, is_published: e.target.checked } : prev)}
+                                      />
+                                      <span className="text-xs text-stone-600">公開する</span>
+                                    </label>
+                                  </div>
+                                  <div>
+                                    <label className="block text-[10px] tracking-wider text-stone-500 mb-1">並び順</label>
+                                    <input
+                                      type="number"
+                                      value={blogForm.sort_order}
+                                      onChange={e => setBlogForm(prev => prev ? { ...prev, sort_order: Number(e.target.value) } : prev)}
+                                      className="w-full text-xs border border-stone-200 px-3 py-2 focus:outline-none focus:border-stone-400"
+                                    />
+                                  </div>
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] tracking-wider text-stone-500 mb-1">投稿日時（空欄の場合、公開時に自動セット）</label>
+                                  <input
+                                    type="datetime-local"
+                                    value={blogForm.published_at}
+                                    onChange={e => setBlogForm(prev => prev ? { ...prev, published_at: e.target.value } : prev)}
+                                    className="text-xs border border-stone-200 px-3 py-2 focus:outline-none focus:border-stone-400"
+                                  />
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={saveBlog}
+                                  disabled={savingBlog}
+                                  className="text-xs tracking-wider text-white bg-stone-800 px-6 py-2 hover:bg-stone-700 transition-colors disabled:opacity-40"
+                                >
+                                  {savingBlog ? '保存中...' : '保存'}
+                                </button>
+
+                                {/* 追加メディア */}
+                                <div className="border-t border-stone-100 pt-4">
+                                  <p className="text-[10px] tracking-[0.3em] text-stone-500 uppercase mb-2">追加メディア</p>
+                                  {loadingBlogMedia ? (
+                                    <p className="text-[10px] text-stone-400">読み込み中...</p>
+                                  ) : (
+                                    <div className="space-y-2 mb-2">
+                                      {blogMedia.map(m => (
+                                        <div key={m.id} className="border border-stone-100 p-2">
+                                          <div className="flex items-center gap-2">
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img src={m.media_url} alt={m.alt ?? ''} className="h-12 w-auto object-cover border border-stone-200 shrink-0" />
+                                            <div className="flex-1 min-w-0">
+                                              <p className="text-[10px] text-stone-500 truncate">{m.title || '(タイトルなし)'}</p>
+                                              <p className="text-[10px] text-stone-400">sort: {m.sort_order} / {m.is_active ? '表示' : '非表示'}</p>
+                                            </div>
+                                            <div className="flex gap-1 shrink-0">
+                                              <button
+                                                type="button"
+                                                onClick={() => toggleBlogMediaActive(m.id, m.is_active)}
+                                                className="text-[10px] border border-stone-200 px-2 py-0.5 hover:border-stone-400 transition-colors"
+                                              >{m.is_active ? '非表示' : '表示'}</button>
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  setEditingBlogMediaId(editingBlogMediaId === m.id ? null : m.id);
+                                                  if (editingBlogMediaId !== m.id) setBlogMediaMeta({ title: m.title ?? '', description: m.description ?? '', alt: m.alt ?? '', sort_order: m.sort_order, media_aspect: m.media_aspect ?? '4:3' });
+                                                }}
+                                                className="text-[10px] border border-stone-200 px-2 py-0.5 hover:border-stone-400 transition-colors"
+                                              >編集</button>
+                                            </div>
+                                          </div>
+                                          {editingBlogMediaId === m.id && (
+                                            <div className="mt-2 space-y-2 pt-2 border-t border-stone-100">
+                                              <div className="grid grid-cols-2 gap-2">
+                                                <div>
+                                                  <label className="block text-[10px] text-stone-400 mb-0.5">タイトル</label>
+                                                  <input type="text" value={blogMediaMeta.title} onChange={e => setBlogMediaMeta(p => ({ ...p, title: e.target.value }))} className="w-full text-[10px] border border-stone-200 px-2 py-1 focus:outline-none" />
+                                                </div>
+                                                <div>
+                                                  <label className="block text-[10px] text-stone-400 mb-0.5">ALT</label>
+                                                  <input type="text" value={blogMediaMeta.alt} onChange={e => setBlogMediaMeta(p => ({ ...p, alt: e.target.value }))} className="w-full text-[10px] border border-stone-200 px-2 py-1 focus:outline-none" />
+                                                </div>
+                                              </div>
+                                              <div>
+                                                <label className="block text-[10px] text-stone-400 mb-0.5">説明</label>
+                                                <input type="text" value={blogMediaMeta.description} onChange={e => setBlogMediaMeta(p => ({ ...p, description: e.target.value }))} className="w-full text-[10px] border border-stone-200 px-2 py-1 focus:outline-none" />
+                                              </div>
+                                              <div className="flex gap-4 items-end">
+                                                <div>
+                                                  <label className="block text-[10px] text-stone-400 mb-0.5">並び順</label>
+                                                  <input type="number" value={blogMediaMeta.sort_order} onChange={e => setBlogMediaMeta(p => ({ ...p, sort_order: Number(e.target.value) }))} className="w-20 text-[10px] border border-stone-200 px-2 py-1 focus:outline-none" />
+                                                </div>
+                                                <div>
+                                                  <label className="block text-[10px] text-stone-400 mb-0.5">表示比率</label>
+                                                  <select value={blogMediaMeta.media_aspect} onChange={e => setBlogMediaMeta(p => ({ ...p, media_aspect: e.target.value }))} className="text-[10px] border border-stone-200 px-1 py-1 focus:outline-none">
+                                                    {BLOG_ASPECT_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+                                                  </select>
+                                                </div>
+                                              </div>
+                                              <button type="button" onClick={() => saveBlogMediaMeta(m.id)} className="text-[10px] border border-stone-700 text-stone-700 px-3 py-1 hover:bg-stone-700 hover:text-white transition-colors">保存</button>
+                                            </div>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => blogMediaFileRef.current?.click()}
+                                    disabled={uploadingBlogMedia}
+                                    className="text-[10px] tracking-wider text-stone-500 border border-stone-300 px-3 py-1 hover:border-stone-500 transition-colors disabled:opacity-40"
+                                  >
+                                    {uploadingBlogMedia ? 'アップロード中...' : '+ 画像を追加'}
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* 新規ブログ追加フォーム */}
+                    {addingBlog ? (
+                      <div className="border border-stone-200 p-4 space-y-3 bg-white">
+                        <p className="text-xs tracking-wider text-stone-600 font-medium">新規ブログ記事</p>
+                        <div>
+                          <label className="block text-[10px] tracking-wider text-stone-500 mb-1">タイトル *</label>
+                          <input
+                            type="text"
+                            value={newBlogForm.title}
+                            onChange={e => setNewBlogForm(prev => ({ ...prev, title: e.target.value }))}
+                            className="w-full text-xs border border-stone-200 px-3 py-2 focus:outline-none focus:border-stone-400"
+                            placeholder="記事タイトル"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[10px] tracking-wider text-stone-500 mb-1">カテゴリ</label>
+                            <input
+                              type="text"
+                              value={newBlogForm.category}
+                              onChange={e => setNewBlogForm(prev => ({ ...prev, category: e.target.value }))}
+                              className="w-full text-xs border border-stone-200 px-3 py-2 focus:outline-none focus:border-stone-400"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] tracking-wider text-stone-500 mb-1">著者名</label>
+                            <input
+                              type="text"
+                              value={newBlogForm.author_name}
+                              onChange={e => setNewBlogForm(prev => ({ ...prev, author_name: e.target.value }))}
+                              className="w-full text-xs border border-stone-200 px-3 py-2 focus:outline-none focus:border-stone-400"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] tracking-wider text-stone-500 mb-1">概要</label>
+                          <textarea
+                            rows={2}
+                            value={newBlogForm.excerpt}
+                            onChange={e => setNewBlogForm(prev => ({ ...prev, excerpt: e.target.value }))}
+                            className="w-full text-xs border border-stone-200 px-3 py-2 focus:outline-none focus:border-stone-400 resize-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] tracking-wider text-stone-500 mb-1">本文</label>
+                          <textarea
+                            rows={6}
+                            value={newBlogForm.body}
+                            onChange={e => setNewBlogForm(prev => ({ ...prev, body: e.target.value }))}
+                            className="w-full text-xs border border-stone-200 px-3 py-2 focus:outline-none focus:border-stone-400 resize-y"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] tracking-wider text-stone-500 mb-1">アイキャッチ画像</label>
+                          {newBlogForm.featured_image_url && (
+                            <div className="mb-2 flex items-start gap-2">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={newBlogForm.featured_image_url} alt="アイキャッチ" className="h-20 w-auto object-cover border border-stone-200" />
+                              <button type="button" onClick={() => setNewBlogForm(prev => ({ ...prev, featured_image_url: null }))} className="text-[10px] text-stone-400 hover:text-stone-600">アイキャッチを外す</button>
+                            </div>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => blogImageRef.current?.click()}
+                            disabled={uploadingBlogImage}
+                            className="text-[10px] tracking-wider text-stone-500 border border-stone-300 px-3 py-1 hover:border-stone-500 transition-colors disabled:opacity-40"
+                          >
+                            {uploadingBlogImage ? 'アップロード中...' : '画像を選択'}
+                          </button>
+                          <div className="mt-2">
+                            <label className="block text-[10px] tracking-wider text-stone-500 mb-1">表示比率</label>
+                            <select
+                              value={newBlogForm.featured_image_aspect}
+                              onChange={e => setNewBlogForm(prev => ({ ...prev, featured_image_aspect: e.target.value }))}
+                              className="text-xs border border-stone-200 px-2 py-1.5 focus:outline-none focus:border-stone-400"
+                            >
+                              {BLOG_ASPECT_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+                            </select>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="flex items-center gap-2 cursor-pointer mt-4">
+                              <input
+                                type="checkbox"
+                                checked={newBlogForm.is_published}
+                                onChange={e => setNewBlogForm(prev => ({ ...prev, is_published: e.target.checked }))}
+                              />
+                              <span className="text-xs text-stone-600">公開する</span>
+                            </label>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] tracking-wider text-stone-500 mb-1">並び順</label>
+                            <input
+                              type="number"
+                              value={newBlogForm.sort_order}
+                              onChange={e => setNewBlogForm(prev => ({ ...prev, sort_order: Number(e.target.value) }))}
+                              className="w-full text-xs border border-stone-200 px-3 py-2 focus:outline-none focus:border-stone-400"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] tracking-wider text-stone-500 mb-1">投稿日時（空欄の場合、公開時に自動セット）</label>
+                          <input
+                            type="datetime-local"
+                            value={newBlogForm.published_at}
+                            onChange={e => setNewBlogForm(prev => ({ ...prev, published_at: e.target.value }))}
+                            className="text-xs border border-stone-200 px-3 py-2 focus:outline-none focus:border-stone-400"
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={createBlog}
+                            disabled={savingBlog}
+                            className="text-xs tracking-wider text-white bg-stone-800 px-6 py-2 hover:bg-stone-700 transition-colors disabled:opacity-40"
+                          >
+                            {savingBlog ? '作成中...' : '作成'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setAddingBlog(false); setNewBlogForm({ ...EMPTY_BLOG_FORM }); }}
+                            className="text-xs tracking-wider text-stone-500 border border-stone-300 px-4 py-2 hover:border-stone-500 transition-colors"
+                          >
+                            キャンセル
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setAddingBlog(true)}
+                        className="text-xs tracking-wider text-stone-600 border border-stone-300 px-4 py-1.5 hover:border-stone-500 transition-colors"
+                      >
+                        + 新規ブログ記事を追加
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* 通常セクション編集フォーム */}
+                {isEditing && form && sec.section_type !== 'staff' && sec.section_type !== 'blog' && (
                   <div className="border-t border-stone-200 p-5 space-y-5 bg-stone-50">
                     {/* 公開設定 */}
                     <label className="flex items-center gap-3 cursor-pointer">
@@ -1811,440 +2258,6 @@ export default function AdminSalonLpPage() {
           {uploadingPickup ? 'アップロード中...' : '+ ピックアップを追加'}
         </button>
         <p className="text-[10px] text-stone-400 mt-1">画像: jpg/png/webp/gif（5MB以下）　動画: mp4/mov/webm（50MB以下）</p>
-      </div>
-
-      {/* ── ブログ管理 ── */}
-      <div className="mt-10">
-        <div className="mb-4">
-          <p className="text-[10px] tracking-[0.3em] text-[#C9A96E] uppercase mb-1">Blog</p>
-          <h2 className="text-base font-light tracking-wider text-stone-800">ブログ管理</h2>
-          <p className="text-xs text-stone-400 mt-0.5">店舗ページに表示するブログ記事を管理します</p>
-        </div>
-
-        {loadingBlogs ? (
-          <p className="text-xs text-stone-400 tracking-wider">読み込み中...</p>
-        ) : (
-          <div className="space-y-2 mb-4">
-            {salonBlogs.map(blog => (
-              <div key={blog.id} className="border border-stone-200 p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className={`shrink-0 text-[10px] px-1.5 py-0.5 border ${blog.is_published ? 'border-emerald-400 text-emerald-600' : 'border-stone-300 text-stone-400'}`}>
-                      {blog.is_published ? '公開' : '非公開'}
-                    </span>
-                    <span className="text-xs text-stone-700 truncate">{blog.title}</span>
-                    {blog.category && <span className="shrink-0 text-[10px] text-stone-400">[{blog.category}]</span>}
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => toggleBlogPublished(blog)}
-                      className="text-[10px] tracking-wider text-stone-500 border border-stone-300 px-2 py-1 hover:border-stone-500 transition-colors"
-                    >
-                      {blog.is_published ? '非公開に' : '公開に'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (editingBlogId === blog.id) {
-                          setEditingBlogId(null);
-                          setBlogForm(null);
-                        } else {
-                          setEditingBlogId(blog.id);
-                          setBlogForm({
-                            title: blog.title,
-                            category: blog.category ?? '',
-                            author_name: blog.author_name ?? '',
-                            excerpt: blog.excerpt ?? '',
-                            body: blog.body ?? '',
-                            featured_image_url: blog.featured_image_url,
-                            featured_image_aspect: (blog as Blog).featured_image_aspect ?? '4:3',
-                            is_published: blog.is_published,
-                            published_at: blog.published_at ? blog.published_at.slice(0, 16) : '',
-                            sort_order: blog.sort_order,
-                          });
-                        }
-                      }}
-                      className="text-[10px] tracking-wider text-stone-500 border border-stone-300 px-2 py-1 hover:border-stone-500 transition-colors"
-                    >
-                      {editingBlogId === blog.id ? '閉じる' : '編集'}
-                    </button>
-                  </div>
-                </div>
-
-                {editingBlogId === blog.id && blogForm && (
-                  <div className="mt-4 space-y-3 border-t border-stone-100 pt-4">
-                    <div>
-                      <label className="block text-[10px] tracking-wider text-stone-500 mb-1">タイトル *</label>
-                      <input
-                        type="text"
-                        value={blogForm.title}
-                        onChange={e => setBlogForm(prev => prev ? { ...prev, title: e.target.value } : prev)}
-                        className="w-full text-xs border border-stone-200 px-3 py-2 focus:outline-none focus:border-stone-400"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-[10px] tracking-wider text-stone-500 mb-1">カテゴリ</label>
-                        <input
-                          type="text"
-                          value={blogForm.category}
-                          onChange={e => setBlogForm(prev => prev ? { ...prev, category: e.target.value } : prev)}
-                          className="w-full text-xs border border-stone-200 px-3 py-2 focus:outline-none focus:border-stone-400"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] tracking-wider text-stone-500 mb-1">著者名</label>
-                        <input
-                          type="text"
-                          value={blogForm.author_name}
-                          onChange={e => setBlogForm(prev => prev ? { ...prev, author_name: e.target.value } : prev)}
-                          className="w-full text-xs border border-stone-200 px-3 py-2 focus:outline-none focus:border-stone-400"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] tracking-wider text-stone-500 mb-1">概要（excerpt）</label>
-                      <textarea
-                        rows={2}
-                        value={blogForm.excerpt}
-                        onChange={e => setBlogForm(prev => prev ? { ...prev, excerpt: e.target.value } : prev)}
-                        className="w-full text-xs border border-stone-200 px-3 py-2 focus:outline-none focus:border-stone-400 resize-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] tracking-wider text-stone-500 mb-1">本文</label>
-                      <textarea
-                        rows={8}
-                        value={blogForm.body}
-                        onChange={e => setBlogForm(prev => prev ? { ...prev, body: e.target.value } : prev)}
-                        className="w-full text-xs border border-stone-200 px-3 py-2 focus:outline-none focus:border-stone-400 resize-y"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] tracking-wider text-stone-500 mb-1">アイキャッチ画像</label>
-                      {blogForm.featured_image_url && (
-                        <div className="mb-2 flex items-start gap-2">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={blogForm.featured_image_url} alt="アイキャッチ" className="h-20 w-auto object-cover border border-stone-200" />
-                          <button
-                            type="button"
-                            onClick={() => setBlogForm(prev => prev ? { ...prev, featured_image_url: null } : prev)}
-                            className="text-[10px] text-stone-400 hover:text-stone-600"
-                          >アイキャッチを外す</button>
-                        </div>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => blogImageRef.current?.click()}
-                        disabled={uploadingBlogImage}
-                        className="text-[10px] tracking-wider text-stone-500 border border-stone-300 px-3 py-1 hover:border-stone-500 transition-colors disabled:opacity-40"
-                      >
-                        {uploadingBlogImage ? 'アップロード中...' : '画像を選択'}
-                      </button>
-                      <div className="mt-2">
-                        <label className="block text-[10px] tracking-wider text-stone-500 mb-1">表示比率</label>
-                        <select
-                          value={blogForm.featured_image_aspect}
-                          onChange={e => setBlogForm(prev => prev ? { ...prev, featured_image_aspect: e.target.value } : prev)}
-                          className="text-xs border border-stone-200 px-2 py-1.5 focus:outline-none focus:border-stone-400"
-                        >
-                          {BLOG_ASPECT_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
-                        </select>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-[10px] tracking-wider text-stone-500 mb-1">公開状態</label>
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={blogForm.is_published}
-                            onChange={e => setBlogForm(prev => prev ? { ...prev, is_published: e.target.checked } : prev)}
-                          />
-                          <span className="text-xs text-stone-600">公開する</span>
-                        </label>
-                      </div>
-                      <div>
-                        <label className="block text-[10px] tracking-wider text-stone-500 mb-1">並び順</label>
-                        <input
-                          type="number"
-                          value={blogForm.sort_order}
-                          onChange={e => setBlogForm(prev => prev ? { ...prev, sort_order: Number(e.target.value) } : prev)}
-                          className="w-full text-xs border border-stone-200 px-3 py-2 focus:outline-none focus:border-stone-400"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] tracking-wider text-stone-500 mb-1">投稿日時（空欄の場合、公開時に自動セット）</label>
-                      <input
-                        type="datetime-local"
-                        value={blogForm.published_at}
-                        onChange={e => setBlogForm(prev => prev ? { ...prev, published_at: e.target.value } : prev)}
-                        className="text-xs border border-stone-200 px-3 py-2 focus:outline-none focus:border-stone-400"
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={saveBlog}
-                      disabled={savingBlog}
-                      className="text-xs tracking-wider text-white bg-stone-800 px-6 py-2 hover:bg-stone-700 transition-colors disabled:opacity-40"
-                    >
-                      {savingBlog ? '保存中...' : '保存'}
-                    </button>
-
-                    {/* 追加メディア */}
-                    <div className="border-t border-stone-100 pt-4">
-                      <p className="text-[10px] tracking-[0.3em] text-stone-500 uppercase mb-2">追加メディア</p>
-                      {loadingBlogMedia ? (
-                        <p className="text-[10px] text-stone-400">読み込み中...</p>
-                      ) : (
-                        <div className="space-y-2 mb-2">
-                          {blogMedia.map(m => (
-                            <div key={m.id} className="border border-stone-100 p-2">
-                              <div className="flex items-center gap-2">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={m.media_url} alt={m.alt ?? ''} className="h-12 w-auto object-cover border border-stone-200 shrink-0" />
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-[10px] text-stone-500 truncate">{m.title || '(タイトルなし)'}</p>
-                                  <p className="text-[10px] text-stone-400">sort: {m.sort_order} / {m.is_active ? '表示' : '非表示'}</p>
-                                </div>
-                                <div className="flex gap-1 shrink-0">
-                                  <button
-                                    type="button"
-                                    onClick={() => toggleBlogMediaActive(m.id, m.is_active)}
-                                    className="text-[10px] border border-stone-200 px-2 py-0.5 hover:border-stone-400 transition-colors"
-                                  >{m.is_active ? '非表示' : '表示'}</button>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setEditingBlogMediaId(editingBlogMediaId === m.id ? null : m.id);
-                                      if (editingBlogMediaId !== m.id) setBlogMediaMeta({ title: m.title ?? '', description: m.description ?? '', alt: m.alt ?? '', sort_order: m.sort_order, media_aspect: m.media_aspect ?? '4:3' });
-                                    }}
-                                    className="text-[10px] border border-stone-200 px-2 py-0.5 hover:border-stone-400 transition-colors"
-                                  >編集</button>
-                                </div>
-                              </div>
-                              {editingBlogMediaId === m.id && (
-                                <div className="mt-2 space-y-2 pt-2 border-t border-stone-100">
-                                  <div className="grid grid-cols-2 gap-2">
-                                    <div>
-                                      <label className="block text-[10px] text-stone-400 mb-0.5">タイトル</label>
-                                      <input type="text" value={blogMediaMeta.title} onChange={e => setBlogMediaMeta(p => ({ ...p, title: e.target.value }))} className="w-full text-[10px] border border-stone-200 px-2 py-1 focus:outline-none" />
-                                    </div>
-                                    <div>
-                                      <label className="block text-[10px] text-stone-400 mb-0.5">ALT</label>
-                                      <input type="text" value={blogMediaMeta.alt} onChange={e => setBlogMediaMeta(p => ({ ...p, alt: e.target.value }))} className="w-full text-[10px] border border-stone-200 px-2 py-1 focus:outline-none" />
-                                    </div>
-                                  </div>
-                                  <div>
-                                    <label className="block text-[10px] text-stone-400 mb-0.5">説明</label>
-                                    <input type="text" value={blogMediaMeta.description} onChange={e => setBlogMediaMeta(p => ({ ...p, description: e.target.value }))} className="w-full text-[10px] border border-stone-200 px-2 py-1 focus:outline-none" />
-                                  </div>
-                                  <div className="flex gap-4 items-end">
-                                    <div>
-                                      <label className="block text-[10px] text-stone-400 mb-0.5">並び順</label>
-                                      <input type="number" value={blogMediaMeta.sort_order} onChange={e => setBlogMediaMeta(p => ({ ...p, sort_order: Number(e.target.value) }))} className="w-20 text-[10px] border border-stone-200 px-2 py-1 focus:outline-none" />
-                                    </div>
-                                    <div>
-                                      <label className="block text-[10px] text-stone-400 mb-0.5">表示比率</label>
-                                      <select value={blogMediaMeta.media_aspect} onChange={e => setBlogMediaMeta(p => ({ ...p, media_aspect: e.target.value }))} className="text-[10px] border border-stone-200 px-1 py-1 focus:outline-none">
-                                        {BLOG_ASPECT_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
-                                      </select>
-                                    </div>
-                                  </div>
-                                  <button type="button" onClick={() => saveBlogMediaMeta(m.id)} className="text-[10px] border border-stone-700 text-stone-700 px-3 py-1 hover:bg-stone-700 hover:text-white transition-colors">保存</button>
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => blogMediaFileRef.current?.click()}
-                        disabled={uploadingBlogMedia}
-                        className="text-[10px] tracking-wider text-stone-500 border border-stone-300 px-3 py-1 hover:border-stone-500 transition-colors disabled:opacity-40"
-                      >
-                        {uploadingBlogMedia ? 'アップロード中...' : '+ 画像を追加'}
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* 新規ブログ追加フォーム */}
-        {addingBlog ? (
-          <div className="border border-stone-200 p-4 space-y-3">
-            <p className="text-xs tracking-wider text-stone-600 font-medium">新規ブログ記事</p>
-            <div>
-              <label className="block text-[10px] tracking-wider text-stone-500 mb-1">タイトル *</label>
-              <input
-                type="text"
-                value={newBlogForm.title}
-                onChange={e => setNewBlogForm(prev => ({ ...prev, title: e.target.value }))}
-                className="w-full text-xs border border-stone-200 px-3 py-2 focus:outline-none focus:border-stone-400"
-                placeholder="記事タイトル"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[10px] tracking-wider text-stone-500 mb-1">カテゴリ</label>
-                <input
-                  type="text"
-                  value={newBlogForm.category}
-                  onChange={e => setNewBlogForm(prev => ({ ...prev, category: e.target.value }))}
-                  className="w-full text-xs border border-stone-200 px-3 py-2 focus:outline-none focus:border-stone-400"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] tracking-wider text-stone-500 mb-1">著者名</label>
-                <input
-                  type="text"
-                  value={newBlogForm.author_name}
-                  onChange={e => setNewBlogForm(prev => ({ ...prev, author_name: e.target.value }))}
-                  className="w-full text-xs border border-stone-200 px-3 py-2 focus:outline-none focus:border-stone-400"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-[10px] tracking-wider text-stone-500 mb-1">概要</label>
-              <textarea
-                rows={2}
-                value={newBlogForm.excerpt}
-                onChange={e => setNewBlogForm(prev => ({ ...prev, excerpt: e.target.value }))}
-                className="w-full text-xs border border-stone-200 px-3 py-2 focus:outline-none focus:border-stone-400 resize-none"
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] tracking-wider text-stone-500 mb-1">本文</label>
-              <textarea
-                rows={6}
-                value={newBlogForm.body}
-                onChange={e => setNewBlogForm(prev => ({ ...prev, body: e.target.value }))}
-                className="w-full text-xs border border-stone-200 px-3 py-2 focus:outline-none focus:border-stone-400 resize-y"
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] tracking-wider text-stone-500 mb-1">アイキャッチ画像</label>
-              {newBlogForm.featured_image_url && (
-                <div className="mb-2 flex items-start gap-2">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={newBlogForm.featured_image_url} alt="アイキャッチ" className="h-20 w-auto object-cover border border-stone-200" />
-                  <button type="button" onClick={() => setNewBlogForm(prev => ({ ...prev, featured_image_url: null }))} className="text-[10px] text-stone-400 hover:text-stone-600">アイキャッチを外す</button>
-                </div>
-              )}
-              <button
-                type="button"
-                onClick={() => blogImageRef.current?.click()}
-                disabled={uploadingBlogImage}
-                className="text-[10px] tracking-wider text-stone-500 border border-stone-300 px-3 py-1 hover:border-stone-500 transition-colors disabled:opacity-40"
-              >
-                {uploadingBlogImage ? 'アップロード中...' : '画像を選択'}
-              </button>
-              <div className="mt-2">
-                <label className="block text-[10px] tracking-wider text-stone-500 mb-1">表示比率</label>
-                <select
-                  value={newBlogForm.featured_image_aspect}
-                  onChange={e => setNewBlogForm(prev => ({ ...prev, featured_image_aspect: e.target.value }))}
-                  className="text-xs border border-stone-200 px-2 py-1.5 focus:outline-none focus:border-stone-400"
-                >
-                  {BLOG_ASPECT_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
-                </select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="flex items-center gap-2 cursor-pointer mt-4">
-                  <input
-                    type="checkbox"
-                    checked={newBlogForm.is_published}
-                    onChange={e => setNewBlogForm(prev => ({ ...prev, is_published: e.target.checked }))}
-                  />
-                  <span className="text-xs text-stone-600">公開する</span>
-                </label>
-              </div>
-              <div>
-                <label className="block text-[10px] tracking-wider text-stone-500 mb-1">並び順</label>
-                <input
-                  type="number"
-                  value={newBlogForm.sort_order}
-                  onChange={e => setNewBlogForm(prev => ({ ...prev, sort_order: Number(e.target.value) }))}
-                  className="w-full text-xs border border-stone-200 px-3 py-2 focus:outline-none focus:border-stone-400"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-[10px] tracking-wider text-stone-500 mb-1">投稿日時（空欄の場合、公開時に自動セット）</label>
-              <input
-                type="datetime-local"
-                value={newBlogForm.published_at}
-                onChange={e => setNewBlogForm(prev => ({ ...prev, published_at: e.target.value }))}
-                className="text-xs border border-stone-200 px-3 py-2 focus:outline-none focus:border-stone-400"
-              />
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={createBlog}
-                disabled={savingBlog}
-                className="text-xs tracking-wider text-white bg-stone-800 px-6 py-2 hover:bg-stone-700 transition-colors disabled:opacity-40"
-              >
-                {savingBlog ? '作成中...' : '作成'}
-              </button>
-              <button
-                type="button"
-                onClick={() => { setAddingBlog(false); setNewBlogForm({ ...EMPTY_BLOG_FORM }); }}
-                className="text-xs tracking-wider text-stone-500 border border-stone-300 px-4 py-2 hover:border-stone-500 transition-colors"
-              >
-                キャンセル
-              </button>
-            </div>
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setAddingBlog(true)}
-            className="text-xs tracking-wider text-stone-600 border border-stone-300 px-4 py-1.5 hover:border-stone-500 transition-colors"
-          >
-            + 新規ブログ記事を追加
-          </button>
-        )}
-      </div>
-
-      {/* ── スタッフ表示順 ── */}
-      <div className="mt-10 pt-8 border-t border-stone-200">
-        <p className="text-[10px] tracking-[0.3em] text-[#C9A96E] uppercase mb-1.5">Staff Order</p>
-        <h2 className="text-sm font-light tracking-wider text-stone-800 mb-1">スタッフ表示順</h2>
-        <p className="text-xs text-stone-400 mb-4">↑↓ で表示順を変更できます。変更はすぐに保存されます。</p>
-        {loadingStaff ? (
-          <p className="text-xs text-stone-400">読み込み中...</p>
-        ) : salonStaff.length === 0 ? (
-          <p className="text-xs text-stone-400">スタッフデータがありません</p>
-        ) : (
-          <div className="space-y-1 max-w-lg">
-            {salonStaff.map(s => (
-              <div key={s.id} className="flex items-center justify-between gap-3 px-3 py-2 border border-stone-200 bg-white">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className={`shrink-0 text-[10px] px-1.5 py-0.5 border ${s.is_active ? 'border-emerald-400 text-emerald-600' : 'border-stone-300 text-stone-400'}`}>
-                    {s.is_active ? '表示' : '非表示'}
-                  </span>
-                  <span className="text-xs text-stone-700 truncate">{s.name}</span>
-                  {s.role && <span className="shrink-0 text-[10px] text-stone-400">{s.role}</span>}
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <button type="button" onClick={() => moveStaff(s, 'up')} disabled={salonStaff.indexOf(s) === 0}
-                    className="text-[10px] text-stone-400 border border-stone-200 px-1.5 py-1 hover:border-stone-400 transition-colors disabled:opacity-30">↑</button>
-                  <button type="button" onClick={() => moveStaff(s, 'down')} disabled={salonStaff.indexOf(s) === salonStaff.length - 1}
-                    className="text-[10px] text-stone-400 border border-stone-200 px-1.5 py-1 hover:border-stone-400 transition-colors disabled:opacity-30">↓</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );
