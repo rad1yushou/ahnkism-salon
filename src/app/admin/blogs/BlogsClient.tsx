@@ -37,6 +37,7 @@ type BlogMedia = {
   sort_order: number;
   is_active: boolean;
   media_aspect: string;
+  thumbnail_url: string | null;
 };
 
 type BlogForm = {
@@ -64,6 +65,31 @@ const toIso = (v: string): string | null => {
   const d = new Date(v);
   return isNaN(d.getTime()) ? null : d.toISOString();
 };
+
+async function generateVideoThumbnail(file: File): Promise<Blob | null> {
+  return new Promise((resolve) => {
+    const video = document.createElement('video');
+    const canvas = document.createElement('canvas');
+    video.muted = true;
+    video.playsInline = true;
+    video.onloadedmetadata = () => {
+      video.currentTime = Math.min(1, video.duration * 0.1);
+    };
+    video.onseeked = () => {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { URL.revokeObjectURL(video.src); resolve(null); return; }
+      ctx.drawImage(video, 0, 0);
+      canvas.toBlob(blob => {
+        URL.revokeObjectURL(video.src);
+        resolve(blob);
+      }, 'image/jpeg', 0.8);
+    };
+    video.onerror = () => { URL.revokeObjectURL(video.src); resolve(null); };
+    video.src = URL.createObjectURL(file);
+  });
+}
 
 export default function BlogsClient({ canEdit = true }: { canEdit?: boolean }) {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
@@ -110,7 +136,7 @@ export default function BlogsClient({ canEdit = true }: { canEdit?: boolean }) {
     setLoadingMedia(true);
     const { data } = await supabase
       .from('salon_blog_media')
-      .select('id, blog_id, media_url, media_type, title, description, alt, sort_order, is_active, media_aspect')
+      .select('id, blog_id, media_url, media_type, title, description, alt, sort_order, is_active, media_aspect, thumbnail_url')
       .eq('blog_id', blogId)
       .order('sort_order', { ascending: true });
     setBlogMedia((data ?? []) as BlogMedia[]);
@@ -245,7 +271,28 @@ export default function BlogsClient({ canEdit = true }: { canEdit?: boolean }) {
       const { error } = await supabase.storage.from(BUCKET).upload(path, file, { upsert: false });
       if (error) { showMsg(`アップロード失敗: ${error.message}`); return; }
       const { data: u } = supabase.storage.from(BUCKET).getPublicUrl(path);
-      const { error: dbErr } = await supabase.from('salon_blog_media').insert({ blog_id: editingBlogId, media_url: u.publicUrl, media_type: mediaType, sort_order: blogMedia.length });
+
+      // 動画の場合はサムネイルを生成してアップロード
+      let thumbnailUrl: string | null = null;
+      if (mediaType === 'video') {
+        const thumbBlob = await generateVideoThumbnail(file);
+        if (thumbBlob) {
+          const thumbPath = `salons/${selectedSlug}/blog/${editingBlogId}/thumb_${Date.now()}.jpg`;
+          const { error: thumbErr } = await supabase.storage.from(BUCKET).upload(thumbPath, thumbBlob, { contentType: 'image/jpeg' });
+          if (!thumbErr) {
+            const { data: thumbU } = supabase.storage.from(BUCKET).getPublicUrl(thumbPath);
+            thumbnailUrl = thumbU.publicUrl;
+          }
+        }
+      }
+
+      const { error: dbErr } = await supabase.from('salon_blog_media').insert({
+        blog_id: editingBlogId,
+        media_url: u.publicUrl,
+        media_type: mediaType,
+        sort_order: blogMedia.length,
+        thumbnail_url: thumbnailUrl,
+      });
       if (dbErr) { showMsg(`DB保存失敗: ${dbErr.message}`); return; }
       showMsg(`${mediaType === 'video' ? '動画' : '画像'}を追加しました`);
       await loadMedia(editingBlogId);

@@ -122,7 +122,7 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
   let lpSections: LpSection[] = [];
   let heroSlides: SalonHeroSlide[] = [];
   let recentBlogs: RecentBlog[] = [];
-  let blogFirstMedia: Record<string, { media_url: string; media_type: string | null }> = {};
+  let blogFirstMedia: Record<string, { media_url: string; media_type: string | null; thumbnail_url: string | null }> = {};
 
   const supabase = await createSupabaseServerClient();
   if (supabase) {
@@ -280,7 +280,7 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
       const blogIds = recentBlogs.map(b => b.id);
       const { data: bmData } = await supabase
         .from('salon_blog_media')
-        .select('blog_id, media_url, media_type')
+        .select('blog_id, media_url, media_type, thumbnail_url')
         .in('blog_id', blogIds)
         .eq('is_active', true)
         .order('sort_order', { ascending: true });
@@ -290,6 +290,7 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
           blogFirstMedia[bid] = {
             media_url: m.media_url as string,
             media_type: m.media_type as string | null,
+            thumbnail_url: (m as { thumbnail_url?: string | null }).thumbnail_url ?? null,
           };
         }
       }
@@ -446,9 +447,15 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
                                 <Image src={blog.featured_image_url} alt={blog.title} fill className="object-cover" unoptimized />
                               </div>
                             ) : fallback?.media_type === 'video' ? (
-                              <div className="aspect-[3/2] bg-stone-900 flex items-center justify-center">
-                                <span className="text-[10px] text-stone-400 tracking-widest">VIDEO</span>
-                              </div>
+                              fallback.thumbnail_url ? (
+                                <div className="aspect-[3/2] bg-stone-50 overflow-hidden relative">
+                                  <Image src={fallback.thumbnail_url} alt={blog.title} fill className="object-cover" unoptimized />
+                                </div>
+                              ) : (
+                                <div className="aspect-[3/2] bg-stone-900 flex items-center justify-center">
+                                  <span className="text-[10px] text-stone-400 tracking-widest">VIDEO</span>
+                                </div>
+                              )
                             ) : fallback?.media_url ? (
                               <div className="aspect-[3/2] bg-stone-50 overflow-hidden relative">
                                 <Image src={fallback.media_url} alt={blog.title} fill className="object-cover" unoptimized />
