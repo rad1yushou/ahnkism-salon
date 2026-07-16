@@ -84,7 +84,7 @@ export default async function Reasons() {
           title="選ばれる理由"
           center
         />
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 lg:gap-x-12 gap-y-14 lg:gap-y-16">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 lg:gap-x-12 gap-y-20 lg:gap-y-24">
           {reasons.map((r, i) => {
             const isLastOdd = reasons.length % 2 !== 0 && i === reasons.length - 1;
             return (
