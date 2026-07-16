@@ -85,38 +85,41 @@ export default async function Reasons() {
           center
         />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 lg:gap-12">
-          {reasons.map((r) => (
-            <div key={r.id} className="flex flex-col gap-4">
-              {r.media_url && (
-                <div className="relative aspect-video w-full overflow-hidden rounded-sm bg-stone-100">
-                  {r.media_type === 'video' ? (
-                    <LazyAutoPlayVideo src={r.media_url} className="w-full h-full object-cover" />
-                  ) : (
-                    <Image
-                      src={r.media_url}
-                      alt={r.title}
-                      fill
-                      className="object-cover"
-                      unoptimized
-                    />
-                  )}
-                </div>
-              )}
-              <div className="flex gap-5">
-                <span className="text-3xl font-light text-stone-200 tracking-wider leading-none shrink-0 w-10">
-                  {r.number_label}
-                </span>
-                <div>
-                  <h3 className="text-lg sm:text-xl tracking-wider text-stone-800 font-light mb-5">
-                    {r.title}
-                  </h3>
-                  <p className="text-xs sm:text-sm text-stone-500 leading-relaxed whitespace-pre-line">
-                    {r.description}
-                  </p>
+          {reasons.map((r, i) => {
+            const isLastOdd = reasons.length % 2 !== 0 && i === reasons.length - 1;
+            return (
+              <div key={r.id} className={`flex flex-col gap-4${isLastOdd ? ' sm:col-span-2 sm:w-1/2 sm:mx-auto' : ''}`}>
+                {r.media_url && (
+                  <div className="relative aspect-video w-full overflow-hidden rounded-sm bg-stone-100">
+                    {r.media_type === 'video' ? (
+                      <LazyAutoPlayVideo src={r.media_url} className="w-full h-full object-cover" />
+                    ) : (
+                      <Image
+                        src={r.media_url}
+                        alt={r.title}
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
+                    )}
+                  </div>
+                )}
+                <div className="flex gap-5">
+                  <span className="text-3xl font-light text-stone-200 tracking-wider leading-none shrink-0 w-10">
+                    {r.number_label}
+                  </span>
+                  <div>
+                    <h3 className="text-lg sm:text-xl tracking-wider text-stone-800 font-light mb-5">
+                      {r.title}
+                    </h3>
+                    <p className="text-xs sm:text-sm text-stone-500 leading-relaxed whitespace-pre-line">
+                      {r.description}
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </Container>
     </section>
