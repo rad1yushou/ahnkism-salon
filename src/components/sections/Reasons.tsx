@@ -107,10 +107,10 @@ export default async function Reasons() {
                   {r.number_label}
                 </span>
                 <div>
-                  <h3 className="text-sm tracking-wider text-stone-800 font-light mb-2">
+                  <h3 className="text-base sm:text-lg tracking-wider text-stone-800 font-semibold mb-3">
                     {r.title}
                   </h3>
-                  <p className="text-xs text-stone-500 leading-relaxed whitespace-pre-line">
+                  <p className="text-xs sm:text-sm text-stone-500 leading-relaxed whitespace-pre-line">
                     {r.description}
                   </p>
                 </div>
