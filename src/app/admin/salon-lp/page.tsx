@@ -11,7 +11,7 @@ const VIDEO_MAX_SIZE = 50 * 1024 * 1024;
 const BUCKET = 'ahnkism-public';
 
 // Supabase select フィールド（1行で定義）
-const LP_SECTION_SELECT = 'id, salon_slug, section_type, title, body, media_url, media_type, media_aspect, media_position, hero_title_position, hero_title_y_percent, layout_type, sort_order, is_active';
+const LP_SECTION_SELECT = 'id, salon_slug, section_type, title, body, media_url, media_type, media_aspect, media_position, hero_title_position, hero_title_y_percent, layout_type, sort_order, is_active, blog_preview_count';
 
 const SALON_SLUGS = ['labo', 'nit', 'elu', 'olea'] as const;
 type SalonSlug = typeof SALON_SLUGS[number];
@@ -106,6 +106,7 @@ type LpSection = {
   layout_type: 'detail' | 'pickup';
   sort_order: number;
   is_active: boolean;
+  blog_preview_count: number;
 };
 
 type SectionMedia = {
@@ -162,6 +163,9 @@ export default function AdminSalonLpPage() {
   const [addingSection, setAddingSection] = useState(false);
   const [newSectionForm, setNewSectionForm] = useState<{ title: string; body: string; is_active: boolean }>({ title: '', body: '', is_active: true });
 
+  const [blogPreviewCountDraft, setBlogPreviewCountDraft] = useState(5);
+  const [savingBlogCount, setSavingBlogCount] = useState(false);
+
   const [salonPickups, setSalonPickups] = useState<SalonPickup[]>([]);
   const [loadingPickups, setLoadingPickups] = useState(false);
   const [uploadingPickup, setUploadingPickup] = useState(false);
@@ -202,6 +206,7 @@ export default function AdminSalonLpPage() {
       layout_type: (r.layout_type ?? 'detail') as LpSection['layout_type'],
       sort_order: r.sort_order,
       is_active: r.is_active,
+      blog_preview_count: (r.blog_preview_count as number | null | undefined) ?? 5,
     })));
   }, [supabase]);
 
@@ -338,6 +343,9 @@ export default function AdminSalonLpPage() {
       hero_title_y_percent: sec.hero_title_y_percent,
       is_active: sec.is_active,
     });
+    if (sec.section_type === 'blog') {
+      setBlogPreviewCountDraft(sec.blog_preview_count);
+    }
   };
 
   const cancelEdit = () => {
@@ -766,6 +774,21 @@ export default function AdminSalonLpPage() {
     await loadSections(selectedSlug);
   };
 
+  const saveBlogPreviewCount = async (sectionId: string) => {
+    if (!supabase) return;
+    const count = Math.min(20, Math.max(1, isNaN(blogPreviewCountDraft) ? 5 : blogPreviewCountDraft));
+    setSavingBlogCount(true);
+    const { error } = await supabase
+      .from('salon_lp_sections')
+      .update({ blog_preview_count: count })
+      .eq('id', sectionId);
+    setSavingBlogCount(false);
+    if (error) { showMessage(`保存失敗: ${error.message}`); return; }
+    setBlogPreviewCountDraft(count);
+    showMessage('保存しました');
+    await loadSections(selectedSlug);
+  };
+
   const toggleSection = async (sec: LpSection) => {
     if (!supabase) return;
     const { error } = await supabase
@@ -934,16 +957,48 @@ export default function AdminSalonLpPage() {
                   </div>
                 )}
 
-                {/* ブログセクション展開 → 専用管理ページへ誘導 */}
+                {/* ブログセクション展開 */}
                 {isEditing && sec.section_type === 'blog' && (
-                  <div className="border-t border-stone-200 p-4 bg-stone-50">
-                    <p className="text-xs text-stone-500 mb-3">ブログ記事の管理は専用ページで行います。</p>
-                    <a
-                      href="/admin/blogs"
-                      className="text-xs tracking-wider text-stone-600 border border-stone-300 px-4 py-1.5 hover:border-stone-500 transition-colors inline-block"
-                    >
-                      ブログ管理ページへ →
-                    </a>
+                  <div className="border-t border-stone-200 p-4 bg-stone-50 space-y-4">
+                    {/* LP プレビュー件数 */}
+                    <div>
+                      <label className="block text-[10px] tracking-widest text-stone-500 mb-2">
+                        LP プレビュー件数（1〜20件）
+                      </label>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="number"
+                          min={1}
+                          max={20}
+                          value={blogPreviewCountDraft}
+                          onChange={e => {
+                            const v = parseInt(e.target.value, 10);
+                            setBlogPreviewCountDraft(isNaN(v) ? 5 : Math.min(20, Math.max(1, v)));
+                          }}
+                          className="w-20 text-xs text-stone-700 border border-stone-200 p-2 focus:outline-none focus:border-stone-400"
+                        />
+                        <span className="text-xs text-stone-400">件</span>
+                        <button
+                          type="button"
+                          onClick={() => saveBlogPreviewCount(sec.id)}
+                          disabled={savingBlogCount}
+                          className="text-xs tracking-wider text-white bg-stone-800 px-4 py-1.5 hover:bg-stone-700 transition-colors disabled:opacity-40"
+                        >
+                          {savingBlogCount ? '保存中...' : '保存する'}
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-stone-400 mt-1">空欄・範囲外は 5 件に戻ります</p>
+                    </div>
+                    {/* ブログ記事管理 */}
+                    <div>
+                      <p className="text-xs text-stone-500 mb-2">ブログ記事の管理は専用ページで行います。</p>
+                      <a
+                        href="/admin/blogs"
+                        className="text-xs tracking-wider text-stone-600 border border-stone-300 px-4 py-1.5 hover:border-stone-500 transition-colors inline-block"
+                      >
+                        ブログ管理ページへ →
+                      </a>
+                    </div>
                   </div>
                 )}
 

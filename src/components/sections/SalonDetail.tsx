@@ -57,6 +57,7 @@ type LpSection = {
   hero_title_y_percent: number;
   layout_type: string;
   sort_order: number;
+  blog_preview_count: number;
   sectionMedia: SectionMedia[];
 };
 
@@ -105,16 +106,6 @@ type RecentBlog = {
   published_at: string | null;
 };
 
-function blogAspectClass(aspect: string | null): string {
-  const map: Record<string, string> = {
-    '1:1':  'aspect-square',
-    '4:3':  'aspect-[4/3]',
-    '3:4':  'aspect-[3/4]',
-    '16:9': 'aspect-video',
-    '9:16': 'aspect-[9/16]',
-  };
-  return map[aspect ?? ''] ?? 'aspect-[4/3]';
-}
 
 // hero / intro / staff / blog 以外は複数メディアグリッド表示を行う（カスタムセクションも含む）
 function isMultiMediaSection(sectionType: string): boolean {
@@ -131,6 +122,7 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
   let lpSections: LpSection[] = [];
   let heroSlides: SalonHeroSlide[] = [];
   let recentBlogs: RecentBlog[] = [];
+  let blogFirstMedia: Record<string, { media_url: string; media_type: string | null }> = {};
 
   const supabase = await createSupabaseServerClient();
   if (supabase) {
@@ -154,7 +146,7 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
         .order('sort_order', { ascending: true }),
       supabase
         .from('salon_lp_sections')
-        .select('id, section_type, title, body, media_url, media_type, media_aspect, media_position, hero_title_position, hero_title_y_percent, layout_type, sort_order')
+        .select('id, section_type, title, body, media_url, media_type, media_aspect, media_position, hero_title_position, hero_title_y_percent, layout_type, sort_order, blog_preview_count')
         .eq('salon_slug', slug)
         .eq('is_active', true)
         .order('sort_order', { ascending: true }),
@@ -171,7 +163,7 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
         .eq('is_published', true)
         .order('sort_order', { ascending: true })
         .order('published_at', { ascending: false })
-        .limit(6),
+        .limit(20),
     ]);
 
     if (!salonRes.error && salonRes.data) {
@@ -266,6 +258,7 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
         hero_title_y_percent: r.hero_title_y_percent ?? 50,
         layout_type: r.layout_type ?? 'detail',
         sort_order: r.sort_order,
+        blog_preview_count: (r.blog_preview_count as number | null | undefined) ?? 5,
         sectionMedia: sectionMediaMap[r.id] ?? [],
       }));
       console.log(`[SalonDetail:${slug}] lpSections sectionMedia:`, lpSections.map(s => `${s.section_type}:${s.sectionMedia.length}`).join(', '));
@@ -280,6 +273,26 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
 
     if (!blogsRes.error && blogsRes.data) {
       recentBlogs = blogsRes.data as RecentBlog[];
+    }
+
+    // ブログ先頭メディア取得（featured_image_url がない場合のフォールバック）
+    if (recentBlogs.length > 0) {
+      const blogIds = recentBlogs.map(b => b.id);
+      const { data: bmData } = await supabase
+        .from('salon_blog_media')
+        .select('blog_id, media_url, media_type')
+        .in('blog_id', blogIds)
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true });
+      for (const m of bmData ?? []) {
+        const bid = (m as { blog_id: string }).blog_id;
+        if (!blogFirstMedia[bid]) {
+          blogFirstMedia[bid] = {
+            media_url: m.media_url as string,
+            media_type: m.media_type as string | null,
+          };
+        }
+      }
     }
   }
 
@@ -413,47 +426,73 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
 
         // ブログセクション
         if (sec.section_type === 'blog') {
-          if (recentBlogs.length === 0) return null;
+          const previewBlogs = recentBlogs.slice(0, sec.blog_preview_count);
+          if (previewBlogs.length === 0) return null;
           return (
-            <section key={sec.id} className="py-8 sm:py-10 border-t border-stone-100">
+            <section key={sec.id} className="py-12 sm:py-16 border-t border-stone-100">
               <Container>
                 <p className="text-[9px] tracking-[0.3em] text-[#C9A96E] uppercase mb-1.5 text-center">Blog</p>
-                <h2 className="text-sm font-light tracking-wider text-stone-800 mb-4 text-center">ブログ</h2>
-                <div className="max-w-2xl mx-auto">
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {recentBlogs.map(blog => (
-                      <Link key={blog.id} href={`/salon/${slug}/blog/${blog.slug}`} className="block border border-stone-100 hover:border-stone-300 transition-colors">
-                        <article>
-                          {blog.featured_image_url && (
-                            <div className="h-16 overflow-hidden bg-stone-50 flex items-center justify-center">
-                              <Image
-                                src={blog.featured_image_url}
-                                alt={blog.title}
-                                width={300}
-                                height={64}
-                                className="w-full h-full object-contain"
-                                unoptimized
-                              />
+                <h2 className="text-sm font-light tracking-wider text-stone-800 mb-8 text-center">ブログ</h2>
+                <div className="max-w-2xl mx-auto space-y-3">
+                  {previewBlogs.map(blog => {
+                    const fallback = blogFirstMedia[blog.id];
+                    return (
+                      <Link key={blog.id} href={`/salon/${slug}/blog/${blog.slug}`} className="block group">
+                        <article className="flex flex-col sm:flex-row border border-stone-100 hover:border-stone-300 transition-colors overflow-hidden">
+                          {/* 上/左: 画像エリア */}
+                          <div className="w-full sm:w-1/3 shrink-0">
+                            {blog.featured_image_url ? (
+                              <div className="aspect-[3/2] bg-stone-50 overflow-hidden relative">
+                                <Image src={blog.featured_image_url} alt={blog.title} fill className="object-cover" unoptimized />
+                              </div>
+                            ) : fallback?.media_type === 'video' ? (
+                              <div className="aspect-[3/2] bg-stone-900 flex items-center justify-center">
+                                <span className="text-[10px] text-stone-400 tracking-widest">VIDEO</span>
+                              </div>
+                            ) : fallback?.media_url ? (
+                              <div className="aspect-[3/2] bg-stone-50 overflow-hidden relative">
+                                <Image src={fallback.media_url} alt={blog.title} fill className="object-cover" unoptimized />
+                              </div>
+                            ) : (
+                              <div className="aspect-[3/2] bg-stone-100" />
+                            )}
+                          </div>
+                          {/* 下/右: テキストエリア */}
+                          <div className="flex-1 min-w-0 p-3 sm:p-4 flex flex-col justify-between">
+                            <div>
+                              <div className="flex items-center gap-2 mb-1">
+                                {blog.category && (
+                                  <span className="text-[9px] tracking-[0.15em] text-[#C9A96E] uppercase">{blog.category}</span>
+                                )}
+                                {blog.published_at && (
+                                  <time className="text-[9px] text-stone-300" dateTime={blog.published_at}>
+                                    {new Date(blog.published_at).toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' })}
+                                  </time>
+                                )}
+                              </div>
+                              {blog.author_name && (
+                                <p className="text-[10px] text-stone-400 mb-1">{blog.author_name}</p>
+                              )}
+                              <h3 className="text-xs font-light text-stone-800 leading-snug line-clamp-2 mb-1">{blog.title}</h3>
+                              {blog.excerpt && (
+                                <p className="text-[10px] text-stone-400 leading-relaxed line-clamp-2">{blog.excerpt}</p>
+                              )}
                             </div>
-                          )}
-                          <div className="p-2">
-                            {blog.category && (
-                              <p className="text-[9px] tracking-[0.15em] text-[#C9A96E] uppercase mb-0.5">{blog.category}</p>
-                            )}
-                            <h3 className="text-xs font-light text-stone-800 leading-snug line-clamp-2 mb-1">{blog.title}</h3>
-                            {blog.excerpt && (
-                              <p className="text-[10px] text-stone-400 leading-relaxed line-clamp-2 mb-1">{blog.excerpt}</p>
-                            )}
-                            {blog.published_at && (
-                              <time className="block text-[9px] text-stone-300" dateTime={blog.published_at}>
-                                {new Date(blog.published_at).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' })}
-                              </time>
-                            )}
+                            <p className="text-[9px] tracking-wider text-stone-400 group-hover:text-stone-600 transition-colors mt-2">続きを読む →</p>
                           </div>
                         </article>
                       </Link>
-                    ))}
-                  </div>
+                    );
+                  })}
+                </div>
+                {/* もっと見る */}
+                <div className="mt-8 text-center">
+                  <Link
+                    href={`/salon/${slug}/blog`}
+                    className="inline-block text-xs tracking-[0.2em] text-stone-600 border border-stone-300 px-8 py-2.5 hover:border-stone-500 hover:text-stone-800 transition-colors"
+                  >
+                    もっと見る
+                  </Link>
                 </div>
               </Container>
             </section>
