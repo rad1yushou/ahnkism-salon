@@ -434,7 +434,7 @@ export default async function SalonDetail({ slug }: SalonDetailProps) {
               <Container>
                 <p className="text-[9px] tracking-[0.3em] text-[#C9A96E] uppercase mb-1.5 text-center">Blog</p>
                 <h2 className="text-sm font-light tracking-wider text-stone-800 mb-8 text-center">ブログ</h2>
-                <div className="max-w-2xl mx-auto space-y-3">
+                <div className="max-w-4xl mx-auto grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {previewBlogs.map(blog => {
                     const fallback = blogFirstMedia[blog.id];
                     return (

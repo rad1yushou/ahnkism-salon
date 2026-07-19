@@ -21,8 +21,12 @@ export default function StaffCard({ member }: StaffCardProps) {
             className="object-cover group-hover:scale-105 transition-transform duration-500"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-stone-300 text-xs tracking-widest group-hover:scale-105 transition-transform duration-500">
-            PHOTO
+          <div className="w-full h-full flex flex-col items-center justify-center gap-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" className="w-7 h-7 text-stone-300">
+              <circle cx="12" cy="8" r="4" />
+              <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" strokeLinecap="round" />
+            </svg>
+            <span className="text-[8px] tracking-[0.2em] text-stone-300 uppercase">Coming Soon</span>
           </div>
         )}
       </div>
