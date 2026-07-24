@@ -25,7 +25,7 @@ export function buildSalonSchema(salon: Salon) {
     },
     openingHours: ['Tu-Su 10:00-20:00'],
     priceRange: '¥¥',
-    image: SITE.ogImage,
+    image: salon.imageUrl ?? SITE.ogImage,
     sameAs: [salon.instagramUrl, salon.hotpepperUrl, salon.googleMapUrl],
   };
 }
