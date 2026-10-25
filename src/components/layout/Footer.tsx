@@ -66,15 +66,6 @@ export default function Footer() {
               >
                 Instagram
               </a>
-              <a
-                href={SITE.line}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs tracking-widest hover:text-[#C9A96E] transition-colors"
-                aria-label="LINE"
-              >
-                LINE
-              </a>
             </div>
           </div>
 
