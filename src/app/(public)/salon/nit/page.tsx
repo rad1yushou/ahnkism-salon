@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 const SLUG = 'nit';
 
-const SEO_TITLE = '大阪・本町のブリーチ・パーマ・メンズ美容室｜nit by AHNKISM';
+const SEO_TITLE = '大阪・北堀江・四ツ橋のブリーチ・パーマ・メンズ美容室｜nit by AHNKISM';
 
 export async function generateMetadata(): Promise<Metadata> {
   const supabase = await createSupabaseServerClient();
