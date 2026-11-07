@@ -253,8 +253,8 @@ export default async function StaffDetailPage({ params }: Props) {
             </div>
           )}
 
-          {/* 予約CTA：アシスタントは指名予約非対応のため非表示 */}
-          {!member.role.includes('アシスタント') && (
+          {/* 予約CTA：アシスタント・レセプションは指名予約非対応のため非表示 */}
+          {!member.role.includes('アシスタント') && !member.role.includes('レセプション') && (
             <ReservationCTA
               href={member.bookingUrl || undefined}
               label={`${member.name}を指名して予約する`}
