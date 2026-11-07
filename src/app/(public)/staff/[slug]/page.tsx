@@ -253,13 +253,15 @@ export default async function StaffDetailPage({ params }: Props) {
             </div>
           )}
 
-          {/* 予約CTA */}
-          <ReservationCTA
-            href={member.bookingUrl || undefined}
-            label={`${member.name}を指名して予約する`}
-            sub="HotPepper Beauty からご予約いただけます"
-            external={!!member.bookingUrl}
-          />
+          {/* 予約CTA：アシスタントは指名予約非対応のため非表示 */}
+          {!member.role.includes('アシスタント') && (
+            <ReservationCTA
+              href={member.bookingUrl || undefined}
+              label={`${member.name}を指名して予約する`}
+              sub="HotPepper Beauty からご予約いただけます"
+              external={!!member.bookingUrl}
+            />
+          )}
 
         </Container>
       </section>
