@@ -9,6 +9,9 @@ import LazyAutoPlayVideo from '@/components/ui/LazyAutoPlayVideo';
 import { getMenuBySlug, type Menu } from '@/constants/menus';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
+// 料金・所要時間の直下に上部予約CTAを表示するメニュー
+const TOP_CTA_SLUGS = ['kamishitsukaizen', 'straight'];
+
 type MenuDetailProps = {
   slug: string;
 };
@@ -126,6 +129,15 @@ export default async function MenuDetail({ slug }: MenuDetailProps) {
               <p className="text-base font-light text-stone-700">{menu.duration}</p>
             </div>
           </div>
+          {TOP_CTA_SLUGS.includes(slug) && (
+            <div className="mb-8">
+              <ReservationCTA
+                href="/reservation"
+                label="店舗・担当者を選んで予約"
+                sub=""
+              />
+            </div>
+          )}
           <p className="text-sm text-stone-600 leading-relaxed mb-12">
             {menu.longDescription}
           </p>
