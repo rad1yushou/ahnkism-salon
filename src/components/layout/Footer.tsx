@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { SITE, BOOKING_URL } from '@/constants/site';
+import { SITE } from '@/constants/site';
 
 const FOOTER_LINKS = [
   {
@@ -93,14 +93,12 @@ export default function Footer() {
 
         {/* Reservation */}
         <div className="border-t border-stone-800 pt-8 mb-8 text-center">
-          <a
-            href={BOOKING_URL}
-            target="_blank"
-            rel="noopener noreferrer"
+          <Link
+            href="/reservation"
             className="inline-block px-10 py-3 border border-[#C9A96E] text-[#C9A96E] text-xs tracking-widest hover:bg-[#C9A96E] hover:text-white transition-all"
           >
-            ご予約はこちら（HotPepper Beauty）
-          </a>
+            ご予約はこちら
+          </Link>
         </div>
 
         {/* Bottom */}
