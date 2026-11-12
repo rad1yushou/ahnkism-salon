@@ -9,7 +9,7 @@ export const metadata: Metadata = (() => {
   const menu = getMenuBySlug(SLUG);
   if (!menu) return {};
   return buildMetadata({
-    title: `${menu.name}｜大阪・心斎橋の美容室 AHNKISM`,
+    title: `${menu.name}｜大阪・心斎橋の美容室`,
     description: menu.description,
     path: `/menu/${SLUG}`,
   });
