@@ -56,6 +56,28 @@ export function buildFaqSchema(faqs: { question: string; answer: string }[]) {
   };
 }
 
+// 構造化データの価格を数値文字列に正規化するメニュー（他メニューは従来どおり）
+const NUMERIC_PRICE_SLUGS = ['kamishitsukaizen', 'straight'];
+
+// 単一価格（例: "25000" / "¥16500" / "¥16,500"）だけを数値文字列に変換する。
+// 料金幅・「〜」・「要相談」などの単一価格でない表記、0円は null を返す。
+function toSinglePriceNumber(price: string): string | null {
+  const m = price.trim().match(/^[¥￥]?\s*(\d{1,3}(?:,\d{3})+|\d+)$/);
+  if (!m) return null;
+  const digits = m[1].replace(/,/g, '');
+  return Number(digits) > 0 ? digits : null;
+}
+
+function buildMenuOffer(menu: Menu) {
+  if (!NUMERIC_PRICE_SLUGS.includes(menu.slug)) {
+    return { '@type': 'Offer', price: menu.price, priceCurrency: 'JPY' };
+  }
+  const numeric = toSinglePriceNumber(menu.price);
+  // 変換できない価格は不正な固定価格を出さず offers を省略する（undefined）
+  if (!numeric) return undefined;
+  return { '@type': 'Offer', price: numeric, priceCurrency: 'JPY' };
+}
+
 export function buildMenuPageSchema(menu: Menu) {
   return {
     '@context': 'https://schema.org',
@@ -67,11 +89,7 @@ export function buildMenuPageSchema(menu: Menu) {
       name: SITE.name,
       url: SITE.url,
     },
-    offers: {
-      '@type': 'Offer',
-      price: menu.price,
-      priceCurrency: 'JPY',
-    },
+    offers: buildMenuOffer(menu),
   };
 }
 
