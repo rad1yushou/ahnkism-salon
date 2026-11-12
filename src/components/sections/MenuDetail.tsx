@@ -10,7 +10,7 @@ import { getMenuBySlug, type Menu } from '@/constants/menus';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 // 料金・所要時間の直下に上部予約CTAを表示するメニュー
-const TOP_CTA_SLUGS = ['kamishitsukaizen', 'straight'];
+const TOP_CTA_SLUGS = ['kamishitsukaizen', 'straight', 'korean-hair'];
 
 type MenuDetailProps = {
   slug: string;
