@@ -18,7 +18,7 @@ const FOOTER_LINKS = [
       { href: '/menu/kamishitsukaizen', label: '髪質改善' },
       { href: '/menu/straight', label: '縮毛矯正' },
       { href: '/menu/color', label: 'カラー' },
-      { href: '/menu/korean-hair', label: '韓国ヘア' },
+      { href: '/menu/korean-hair', label: 'パーフェクト艶カラー' },
       { href: '/menu/eyelash', label: 'まつ毛エクステ' },
     ],
   },
