@@ -10,7 +10,7 @@ type SalonCardProps = {
 export default function SalonCard({ salon, imageUrl }: SalonCardProps) {
   return (
     <div className="group border border-stone-200 hover:border-[#C9A96E] transition-colors duration-300 bg-white flex flex-col">
-      <Link href={`/salon/${salon.slug}`} className="block">
+      <Link href={`/salon/${salon.slug}`} prefetch={true} className="block">
         <div className="aspect-[4/3] bg-stone-100 overflow-hidden relative">
           {imageUrl ? (
             <Image
@@ -38,8 +38,15 @@ export default function SalonCard({ salon, imageUrl }: SalonCardProps) {
           <p className="mt-3 text-xs text-stone-400">{salon.nearestStation}</p>
         </div>
       </Link>
-      {salon.hotpepperUrl && (
-        <div className="px-5 pb-5 mt-auto">
+      <div className="px-5 pb-5 mt-auto flex flex-col gap-3">
+        <Link
+          href={`/salon/${salon.slug}`}
+          prefetch={true}
+          className="block w-full py-3 border border-[#C9A96E] text-stone-800 hover:bg-stone-50 text-sm tracking-widest text-center transition-colors duration-200"
+        >
+          店舗ホームページを見る
+        </Link>
+        {salon.hotpepperUrl && (
           <a
             href={salon.hotpepperUrl}
             target="_blank"
@@ -48,8 +55,8 @@ export default function SalonCard({ salon, imageUrl }: SalonCardProps) {
           >
             HotPepperで予約
           </a>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
